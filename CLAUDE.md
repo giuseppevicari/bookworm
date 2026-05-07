@@ -23,8 +23,8 @@ Update this file when new decisions are made.
 
 | Library | Version | Source |
 |---|---|---|
-| Chart.js | 4.4.3 | cdnjs |
-| chartjs-plugin-annotation | 3.0.1 | cdnjs |
+| Chart.js | 4.4.3 | jsDelivr (cdnjs blocked by ORB due to `Chart.js` path) |
+| chartjs-plugin-annotation | 3.0.1 | jsDelivr |
 | PDF.js | 3.11.174 | cdnjs |
 
 Load all libraries from CDN in the `<head>`. Do not use npm, bundlers, or local files.

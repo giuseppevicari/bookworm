@@ -11,8 +11,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <!-- CDN Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
@@ -437,6 +437,66 @@
     .analyse-btn:active:not(:disabled) { transform: translateY(0); }
     .analyse-btn:disabled { opacity: 0.38; cursor: not-allowed; }
 
+    /* ── Sliders ─────────────────────────────────────────────────── */
+    .sliders-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      margin-bottom: 9px;
+    }
+
+    .slider-val {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-primary);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      transition: background 150ms, transform 150ms;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: var(--accent-hover);
+      transform: scale(1.2);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+    }
+
     /* ── Chart area ──────────────────────────────────────────────── */
     .chart-card {
       background: var(--bg-card);
@@ -446,7 +506,7 @@
     }
 
     .chart-placeholder {
-      height: 380px;
+      height: 360px;
       border: 1px dashed var(--border);
       border-radius: 8px;
       background: var(--bg-secondary);
@@ -465,7 +525,76 @@
       opacity: 0.55;
     }
 
-    #mainChart { display: none; }
+    /* ── Analysis progress (inside chart card) ───────────────────── */
+    .analysis-progress {
+      display: none;
+      margin-bottom: 14px;
+    }
+    .analysis-progress.visible { display: block; }
+
+    .analysis-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .analysis-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 150ms ease;
+    }
+
+    .analysis-status-text {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+
+    /* ── Chart canvas wrapper (gives canvas a defined height) ────── */
+    .chart-canvas-wrapper {
+      height: 360px;
+      position: relative;
+      display: none;
+    }
+    .chart-canvas-wrapper.visible { display: block; }
+
+    /* ── Chart legend ────────────────────────────────────────────── */
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+      min-height: 0;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-primary);
+      transition: opacity 150ms, border-color 150ms;
+    }
+
+    .legend-item.faded { opacity: 0.35; }
+    .legend-item:hover { border-color: var(--text-secondary); }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -564,6 +693,24 @@
               </svg>
               Analyse
             </button>
+
+            <!-- Window and step sliders -->
+            <div class="sliders-row">
+              <div class="slider-group">
+                <label>
+                  Window size
+                  <span class="slider-val" id="windowVal">500</span>
+                </label>
+                <input type="range" id="windowSlider" min="100" max="2000" step="100" value="500">
+              </div>
+              <div class="slider-group">
+                <label>
+                  Step size
+                  <span class="slider-val" id="stepVal">100</span>
+                </label>
+                <input type="range" id="stepSlider" min="50" max="500" step="50" value="100">
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -571,13 +718,30 @@
       <!-- ── Chart ────────────────────────────────────────────── -->
       <div class="chart-card">
         <div class="card-label">03 — Frequency Chart</div>
+
+        <!-- Analysis progress bar -->
+        <div class="analysis-progress" id="analysisProgress">
+          <div class="analysis-track">
+            <div class="analysis-fill" id="analysisFill"></div>
+          </div>
+          <div class="analysis-status-text" id="analysisStatusText">Analysing…</div>
+        </div>
+
+        <!-- Empty state placeholder -->
         <div class="chart-placeholder" id="chartPlaceholder">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
           </svg>
           <p>Upload a file and add words to begin</p>
         </div>
-        <canvas id="mainChart"></canvas>
+
+        <!-- Chart canvas (hidden until data is ready) -->
+        <div class="chart-canvas-wrapper" id="chartWrapper">
+          <canvas id="mainChart"></canvas>
+        </div>
+
+        <!-- Clickable word legend -->
+        <div class="chart-legend" id="chartLegend"></div>
       </div>
 
     </div>
@@ -589,14 +753,14 @@
     // ─────────────────────────────────────────────────────────────────
 
     const state = {
-      rawText:       '',
-      words:         [],
-      windows:       [],
-      chapters:      [],
-      windowSize:    500,
-      stepSize:      100,
-      chart:         null,
-      isAnimating:   false,
+      rawText:        '',
+      words:          [],
+      windows:        [],
+      chapters:       [],
+      windowSize:     500,
+      stepSize:       100,
+      chart:          null,
+      isAnimating:    false,
       animationSpeed: 1,
     };
 
@@ -683,82 +847,289 @@
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // ANALYSER  (stub — Phase 2)
+    // ANALYSER
     // ─────────────────────────────────────────────────────────────────
 
-    // Run sliding window frequency analysis across state.rawText
-    function runAnalysis() {
-      // Phase 2
+    // Split text into lowercase tokens, stripping punctuation (keeps apostrophes/hyphens)
+    function tokenize(text) {
+      return text
+        .toLowerCase()
+        .replace(/[^a-z0-9'\-\s]/g, ' ')
+        .split(/\s+/)
+        .filter(t => t.length > 0 && /[a-z]/.test(t));
+    }
+
+    // Slide a window across tokens, counting tracked words; yields to keep UI responsive
+    async function computeWindows(tokens, words, windowSize, stepSize, onProgress) {
+      const results  = [];
+      const wordList = words.map(w => w.word);
+      const wordSet  = new Set(wordList);
+      const CHUNK    = 400;
+      let wi = 0;
+      const totalWindows = Math.max(1,
+        Math.floor((tokens.length - windowSize) / stepSize) + 1);
+
+      for (let start = 0; start + windowSize <= tokens.length; start += stepSize) {
+        const counts = {};
+        wordList.forEach(w => { counts[w] = 0; });
+
+        for (let j = start; j < start + windowSize; j++) {
+          if (wordSet.has(tokens[j])) counts[tokens[j]]++;
+        }
+
+        results.push({ offset: start, counts });
+        wi++;
+
+        if (wi % CHUNK === 0) {
+          onProgress(wi / totalWindows);
+          await new Promise(r => setTimeout(r, 0));
+        }
+      }
+
+      return results;
+    }
+
+    // Tokenize, slide window, store in state, then render chart
+    async function runAnalysis() {
+      if (!state.rawText || state.words.length === 0) return;
+
+      showAnalysisProgress('Tokenizing…');
+      analyseBtn.disabled = true;
+
+      const tokens = tokenize(state.rawText);
+
+      // Clamp window/step to actual text length so short texts still produce data
+      const effectiveWindow = Math.min(state.windowSize, tokens.length);
+      const effectiveStep   = Math.min(state.stepSize, effectiveWindow);
+
+      showAnalysisProgress(
+        `Analysing "${state.words.map(w => w.word).join(', ')}"…`
+      );
+      setAnalysisProgress(0.04);
+
+      state.windows = await computeWindows(
+        tokens,
+        state.words,
+        effectiveWindow,
+        effectiveStep,
+        pct => setAnalysisProgress(0.04 + pct * 0.96)
+      );
+
+      hideAnalysisProgress();
+      analyseBtn.disabled = false;
+      renderChart();
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // CHART  (stub — Phase 2)
+    // CHART
     // ─────────────────────────────────────────────────────────────────
 
-    // Initialise and render the Chart.js frequency chart
+    // Attempt manual registration of the annotation plugin (needed for Phase 3)
+    try {
+      if (window.ChartAnnotation) Chart.register(window.ChartAnnotation);
+    } catch (_) {}
+
+    // Build Chart.js dataset objects from current state.words and state.windows
+    function buildDatasets() {
+      return state.words.map(w => ({
+        label:                    w.word,
+        data:                     state.windows.map(win => win.counts[w.word] || 0),
+        borderColor:              w.color,
+        backgroundColor:          w.color + '12',
+        borderWidth:              2.5,
+        pointRadius:              state.windows.length > 300 ? 0 : 3,
+        pointHoverRadius:         6,
+        pointHoverBackgroundColor: w.color,
+        pointHoverBorderColor:    '#0e0e12',
+        pointHoverBorderWidth:    2,
+        tension:                  0.4,
+        fill:                     false,
+        hidden:                   !w.visible,
+      }));
+    }
+
+    // Build x-axis labels as book-position percentages
+    function buildLabels() {
+      if (!state.windows.length) return [];
+      const last = state.windows[state.windows.length - 1].offset;
+      return state.windows.map(w =>
+        last > 0 ? `${Math.round((w.offset / last) * 100)}%` : '0%'
+      );
+    }
+
+    // Destroy any existing chart, then render a fresh one from state
     function renderChart() {
-      // Phase 2
+      const placeholder = document.getElementById('chartPlaceholder');
+      const wrapper     = document.getElementById('chartWrapper');
+
+      if (!state.windows.length || !state.words.length) {
+        placeholder.style.display = 'flex';
+        wrapper.classList.remove('visible');
+        document.getElementById('chartLegend').innerHTML = '';
+        return;
+      }
+
+      placeholder.style.display = 'none';
+      wrapper.classList.add('visible');
+
+      if (state.chart) {
+        state.chart.destroy();
+        state.chart = null;
+      }
+
+      const canvas = document.getElementById('mainChart');
+      state.chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels:   buildLabels(),
+          datasets: buildDatasets(),
+        },
+        options: {
+          devicePixelRatio:    window.devicePixelRatio || 1,
+          responsive:          true,
+          maintainAspectRatio: false,
+          animation:           { duration: 350 },
+          interaction:         { mode: 'index', intersect: false },
+          scales: {
+            x: {
+              grid:   { color: 'rgba(255,255,255,0.04)' },
+              border: { color: 'rgba(255,255,255,0.08)' },
+              ticks: {
+                color:        '#8884a0',
+                font:         { family: "'DM Sans'", size: 11 },
+                maxTicksLimit: 12,
+                maxRotation:  0,
+              },
+            },
+            y: {
+              grid:   { color: 'rgba(255,255,255,0.04)' },
+              border: { display: false },
+              ticks: {
+                color: '#8884a0',
+                font:  { family: "'DM Sans'", size: 11 },
+              },
+              beginAtZero: true,
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1c1c26',
+              borderColor:     '#2a2a38',
+              borderWidth:     1,
+              titleColor:      '#8884a0',
+              titleFont:       { family: "'DM Sans'", size: 11 },
+              bodyColor:       '#e8e6f0',
+              bodyFont:        { family: "'DM Sans'", size: 12 },
+              padding:         12,
+              displayColors:   true,
+              boxWidth:        10,
+              boxHeight:       10,
+              callbacks: {
+                title:  items => `Position: ${items[0].label}`,
+                label:  item  => `  ${item.dataset.label}: ${item.raw}`,
+              },
+            },
+          },
+        },
+      });
+
+      renderLegend();
+    }
+
+    // Swap datasets in place without destroying the chart (word added/removed)
+    function updateChart() {
+      if (!state.chart) { renderChart(); return; }
+      if (!state.windows.length || !state.words.length) { renderChart(); return; }
+      state.chart.data.labels   = buildLabels();
+      state.chart.data.datasets = buildDatasets();
+      state.chart.update('none');
+      renderLegend();
+    }
+
+    // Render the row of clickable word legend pills below the chart
+    function renderLegend() {
+      const legend = document.getElementById('chartLegend');
+      legend.innerHTML = '';
+
+      state.words.forEach((w, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'legend-item' + (w.visible ? '' : ' faded');
+        btn.innerHTML =
+          `<span class="legend-dot" style="background:${w.color}"></span>` +
+          `<span>${w.word}</span>`;
+        btn.title = w.visible ? `Hide "${w.word}"` : `Show "${w.word}"`;
+        btn.addEventListener('click', () => toggleWordVisibility(i));
+        legend.appendChild(btn);
+      });
+    }
+
+    // Show or hide a single word's dataset on the chart
+    function toggleWordVisibility(index) {
+      const w = state.words[index];
+      w.visible = !w.visible;
+      if (state.chart) {
+        state.chart.setDatasetVisibility(index, w.visible);
+        state.chart.update('none');
+      }
+      renderLegend();
     }
 
     // ─────────────────────────────────────────────────────────────────
     // UI
     // ─────────────────────────────────────────────────────────────────
 
-    const uploadZone   = document.getElementById('uploadZone');
-    const fileInput    = document.getElementById('fileInput');
-    const uploadStatus = document.getElementById('uploadStatus');
-    const progressFill = document.getElementById('progressFill');
-    const progressLabel= document.getElementById('progressLabel');
-    const errorMsg     = document.getElementById('errorMsg');
-    const errorText    = document.getElementById('errorText');
-    const fileInfo     = document.getElementById('fileInfo');
-    const fileName     = document.getElementById('fileName');
-    const wordCount    = document.getElementById('wordCount');
-    const changeFileBtn= document.getElementById('changeFileBtn');
-    const wordSection  = document.getElementById('wordSection');
-    const chipWrapper  = document.getElementById('chipWrapper');
-    const wordInput    = document.getElementById('wordInput');
-    const analyseBtn   = document.getElementById('analyseBtn');
+    const uploadZone    = document.getElementById('uploadZone');
+    const fileInput     = document.getElementById('fileInput');
+    const uploadStatus  = document.getElementById('uploadStatus');
+    const progressFill  = document.getElementById('progressFill');
+    const progressLabel = document.getElementById('progressLabel');
+    const errorMsg      = document.getElementById('errorMsg');
+    const errorText     = document.getElementById('errorText');
+    const fileInfo      = document.getElementById('fileInfo');
+    const fileName      = document.getElementById('fileName');
+    const wordCount     = document.getElementById('wordCount');
+    const changeFileBtn = document.getElementById('changeFileBtn');
+    const wordSection   = document.getElementById('wordSection');
+    const chipWrapper   = document.getElementById('chipWrapper');
+    const wordInput     = document.getElementById('wordInput');
+    const analyseBtn    = document.getElementById('analyseBtn');
+    const windowSlider  = document.getElementById('windowSlider');
+    const stepSlider    = document.getElementById('stepSlider');
+    const windowVal     = document.getElementById('windowVal');
+    const stepVal       = document.getElementById('stepVal');
 
-    // Show the progress bar with a label and filled percentage (0–1)
+    // Show the upload progress bar with a label and fill (0–1)
     function showProgress(msg, pct) {
       uploadStatus.classList.add('visible');
-      progressFill.style.width = `${Math.round(pct * 100)}%`;
+      progressFill.style.width  = `${Math.round(pct * 100)}%`;
       progressLabel.textContent = msg;
     }
 
-    // Hide the progress bar
-    function hideProgress() {
-      uploadStatus.classList.remove('visible');
-    }
+    // Hide the upload progress bar
+    function hideProgress() { uploadStatus.classList.remove('visible'); }
 
-    // Display an error message below the upload zone
+    // Display an error banner below the upload zone
     function showError(msg) {
       errorMsg.classList.add('visible');
       errorText.textContent = msg;
     }
 
-    // Hide the error message
-    function hideError() {
-      errorMsg.classList.remove('visible');
-    }
+    // Hide the error banner
+    function hideError() { errorMsg.classList.remove('visible'); }
 
-    // Show the post-upload file summary card
+    // Show the post-upload file summary
     function showFileInfo(name, words) {
       fileInfo.classList.add('visible');
-      fileName.textContent = name;
+      fileName.textContent  = name;
       wordCount.textContent = `${words.toLocaleString()} words extracted`;
     }
 
-    // Hide the file summary card
-    function hideFileInfo() {
-      fileInfo.classList.remove('visible');
-    }
+    // Hide the post-upload file summary
+    function hideFileInfo() { fileInfo.classList.remove('visible'); }
 
-    // Unlock the word input section after a file loads successfully
-    function enableWordSection() {
-      wordSection.classList.add('enabled');
-    }
+    // Unlock the word input section after a successful file load
+    function enableWordSection() { wordSection.classList.add('enabled'); }
 
     // Lock the word input section and clear all chips
     function disableWordSection() {
@@ -767,18 +1138,34 @@
       renderChips();
     }
 
-    // Return the palette color for a given word index (cycles if > 8)
-    function getWordColor(index) {
-      return WORD_COLORS[index % WORD_COLORS.length];
+    // Show the analysis progress bar with a message
+    function showAnalysisProgress(msg) {
+      const el = document.getElementById('analysisProgress');
+      el.classList.add('visible');
+      document.getElementById('analysisStatusText').textContent = msg;
     }
 
-    // Re-render all word chips inside the chip wrapper, preserving the text input
+    // Update the analysis progress bar fill (0–1)
+    function setAnalysisProgress(pct) {
+      document.getElementById('analysisFill').style.width =
+        `${Math.round(pct * 100)}%`;
+    }
+
+    // Hide the analysis progress bar
+    function hideAnalysisProgress() {
+      document.getElementById('analysisProgress').classList.remove('visible');
+    }
+
+    // Return the palette color for a given word index
+    function getWordColor(index) { return WORD_COLORS[index % WORD_COLORS.length]; }
+
+    // Re-render all word chips inside the wrapper, preserving the text input
     function renderChips() {
       chipWrapper.querySelectorAll('.word-chip').forEach(el => el.remove());
 
       state.words.forEach((w, i) => {
-        const chip = document.createElement('span');
-        chip.className = 'word-chip';
+        const chip  = document.createElement('span');
+        chip.className   = 'word-chip';
         chip.style.background = w.color;
 
         const label = document.createElement('span');
@@ -798,7 +1185,7 @@
       updateAnalyseButton();
     }
 
-    // Add a normalised word to state.words if valid and not duplicate
+    // Add a normalised word to state.words; re-run analysis if results already exist
     function addWord(raw) {
       const word = raw.trim().toLowerCase();
       if (!word || state.words.length >= 8) return;
@@ -806,21 +1193,23 @@
 
       state.words.push({ word, color: getWordColor(state.words.length), visible: true });
       renderChips();
+
+      if (state.windows.length > 0) runAnalysis();
     }
 
-    // Remove a word by index and reassign colors to maintain palette order
+    // Remove a word by index, reassign palette colors, update chart
     function removeWord(index) {
       state.words.splice(index, 1);
       state.words.forEach((w, i) => { w.color = getWordColor(i); });
       renderChips();
+
+      if (state.windows.length > 0) updateChart();
     }
 
-    // Enable or disable the Analyse button based on current word count
-    function updateAnalyseButton() {
-      analyseBtn.disabled = state.words.length === 0;
-    }
+    // Enable or disable the Analyse button based on word count
+    function updateAnalyseButton() { analyseBtn.disabled = state.words.length === 0; }
 
-    // Handle Enter / comma as word submission; Backspace to delete last chip
+    // Submit a word on Enter or comma; remove last on Backspace when input is empty
     wordInput.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ',') {
         e.preventDefault();
@@ -831,7 +1220,7 @@
       }
     });
 
-    // Handle pasting a comma-separated list of words
+    // Split a pasted comma-separated list into multiple word chips
     wordInput.addEventListener('paste', e => {
       e.preventDefault();
       const pasted = (e.clipboardData || window.clipboardData).getData('text');
@@ -839,26 +1228,48 @@
       wordInput.value = '';
     });
 
-    // Clicking the chip wrapper focuses the hidden text input
+    // Clicking the wrapper container focuses the text input
     chipWrapper.addEventListener('click', () => wordInput.focus());
 
-    // Analyse button triggers the sliding window analysis (Phase 2)
+    // Analyse button triggers the full analysis pipeline
     analyseBtn.addEventListener('click', () => {
       if (state.words.length > 0) runAnalysis();
     });
 
-    // Prevent browser default on dragover so drop fires
+    // Show live slider value while dragging
+    windowSlider.addEventListener('input', () => {
+      state.windowSize       = parseInt(windowSlider.value);
+      windowVal.textContent  = windowSlider.value;
+    });
+
+    // Re-run analysis when window size is committed (mouse/touch release)
+    windowSlider.addEventListener('change', () => {
+      if (state.windows.length > 0) runAnalysis();
+    });
+
+    // Show live slider value while dragging
+    stepSlider.addEventListener('input', () => {
+      state.stepSize      = parseInt(stepSlider.value);
+      stepVal.textContent = stepSlider.value;
+    });
+
+    // Re-run analysis when step size is committed
+    stepSlider.addEventListener('change', () => {
+      if (state.windows.length > 0) runAnalysis();
+    });
+
+    // Prevent browser default on dragover so drop fires correctly
     uploadZone.addEventListener('dragover', e => {
       e.preventDefault();
       uploadZone.classList.add('drag-over');
     });
 
-    // Remove drag-over highlight when cursor leaves
+    // Remove drag-over highlight when the cursor leaves the zone
     uploadZone.addEventListener('dragleave', () => {
       uploadZone.classList.remove('drag-over');
     });
 
-    // Handle dropped file
+    // Handle a dropped file
     uploadZone.addEventListener('drop', e => {
       e.preventDefault();
       uploadZone.classList.remove('drag-over');
@@ -866,20 +1277,23 @@
       if (file) handleFile(file);
     });
 
-    // Handle file picked via the browse dialog
+    // Handle a file picked via the browse dialog
     fileInput.addEventListener('change', () => {
       if (fileInput.files[0]) handleFile(fileInput.files[0]);
     });
 
-    // Reset everything when the user clicks "Change"
+    // Reset all state and UI when the user clicks "Change"
     changeFileBtn.addEventListener('click', e => {
       e.stopPropagation();
       state.rawText = '';
+      state.windows = [];
+      if (state.chart) { state.chart.destroy(); state.chart = null; }
       fileInput.value = '';
       hideFileInfo();
       hideError();
       hideProgress();
       disableWordSection();
+      renderChart();
     });
 
     // ─────────────────────────────────────────────────────────────────
