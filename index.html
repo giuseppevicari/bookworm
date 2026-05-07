@@ -595,6 +595,44 @@
       border-radius: 50%;
       flex-shrink: 0;
     }
+
+    /* ── Chapter panel ───────────────────────────────────────────── */
+    .chapter-panel { padding: 22px 28px 20px; }
+
+    .chapter-notice {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      padding: 4px 0;
+    }
+
+    .chapter-notice svg { flex-shrink: 0; opacity: 0.5; }
+
+    .chapter-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 120px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .chapter-item {
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      padding: 4px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      cursor: default;
+      transition: border-color 150ms, color 150ms;
+    }
+
+    .chapter-item:hover { border-color: var(--text-secondary); color: var(--text-primary); }
   </style>
 </head>
 <body>
@@ -744,6 +782,18 @@
         <div class="chart-legend" id="chartLegend"></div>
       </div>
 
+      <!-- ── Chapters ───────────────────────────────────────────── -->
+      <div class="card chapter-panel" id="chapterPanel" style="display:none">
+        <div class="card-label">04 — Chapters</div>
+        <div class="chapter-notice" id="chapterNotice" style="display:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>No chapters detected in this document</span>
+        </div>
+        <div class="chapter-list" id="chapterList"></div>
+      </div>
+
     </div>
   </div>
 
@@ -835,10 +885,12 @@
           });
         }
 
-        state.rawText = text;
+        state.rawText  = text;
+        state.chapters = detectChapters(text);
         hideProgress();
         showFileInfo(file.name, countWords(text));
         enableWordSection();
+        renderChapterPanel();
 
       } catch (err) {
         hideProgress();
@@ -889,6 +941,40 @@
       return results;
     }
 
+    // Scan rawText for chapter/part/book headings; return array of { title, wordOffset }
+    function detectChapters(text) {
+      const WRITTEN = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve' +
+        '|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty';
+      // Roman numerals — require ≥2 meaningful chars to avoid matching lone "I"
+      const ROMAN = 'M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|VI{0,3}|I{2,3}|V)';
+      const pats = [
+        new RegExp(`^chapter[\\t ]+(?:[0-9]+|${WRITTEN}|${ROMAN})(?:[^\\n]{0,80})?`, 'gim'),
+        new RegExp(`^(?:part|book)[\\t ]+(?:[0-9]+|${ROMAN}|${WRITTEN})(?:[^\\n]{0,80})?`, 'gim'),
+        /^(?:prologue|epilogue|afterword|introduction)(?:[^\n]{0,80})?/gim,
+      ];
+
+      const raw = [];
+      for (const re of pats) {
+        let m;
+        while ((m = re.exec(text)) !== null)
+          raw.push({ title: m[0].trim().replace(/\s+/g, ' '), charPos: m.index });
+      }
+
+      raw.sort((a, b) => a.charPos - b.charPos);
+
+      // Deduplicate matches within 50 characters of each other
+      const seen = [];
+      let lastPos = -999;
+      for (const r of raw) {
+        if (r.charPos - lastPos > 50) { seen.push(r); lastPos = r.charPos; }
+      }
+
+      return seen.map(r => ({
+        title: r.title.length > 40 ? r.title.slice(0, 38) + '…' : r.title,
+        wordOffset: text.slice(0, r.charPos).trim().split(/\s+/).filter(Boolean).length,
+      }));
+    }
+
     // Tokenize, slide window, store in state, then render chart
     async function runAnalysis() {
       if (!state.rawText || state.words.length === 0) return;
@@ -924,9 +1010,14 @@
     // CHART
     // ─────────────────────────────────────────────────────────────────
 
-    // Attempt manual registration of the annotation plugin (needed for Phase 3)
+    // Register the annotation plugin; track success so renderChart can gate on it
+    let annotationAvailable = false;
     try {
-      if (window.ChartAnnotation) Chart.register(window.ChartAnnotation);
+      const plugin = window.ChartAnnotation || window['chartjs-plugin-annotation'];
+      if (plugin) {
+        Chart.register(plugin);
+        annotationAvailable = true;
+      }
     } catch (_) {}
 
     // Build Chart.js dataset objects from current state.words and state.windows
@@ -946,6 +1037,66 @@
         fill:                     false,
         hidden:                   !w.visible,
       }));
+    }
+
+    // Convert state.chapters to chartjs-plugin-annotation config, keyed by window index
+    function buildChapterAnnotations() {
+      if (!annotationAvailable || !state.chapters.length || !state.windows.length) return {};
+      const annotations = {};
+      state.chapters.forEach((ch, i) => {
+        let closest = 0, minDiff = Infinity;
+        state.windows.forEach((win, idx) => {
+          const d = Math.abs(win.offset - ch.wordOffset);
+          if (d < minDiff) { minDiff = d; closest = idx; }
+        });
+        annotations[`ch${i}`] = {
+          type: 'line',
+          xMin: closest,
+          xMax: closest,
+          borderColor: 'rgba(255,255,255,0.18)',
+          borderWidth: 1,
+          borderDash: [4, 4],
+          label: {
+            display: true,
+            content: ch.title,
+            rotation: -90,
+            position: 'start',
+            yAdjust: 8,
+            color: 'rgba(136,132,160,0.75)',
+            font: { family: "'DM Sans'", size: 9 },
+            backgroundColor: 'transparent',
+            padding: { x: 2, y: 2 },
+          },
+        };
+      });
+      return annotations;
+    }
+
+    // Show the chapter list panel (or "no chapters" notice) based on state
+    function renderChapterPanel() {
+      const panel  = document.getElementById('chapterPanel');
+      const notice = document.getElementById('chapterNotice');
+      const list   = document.getElementById('chapterList');
+
+      if (!state.rawText) { panel.style.display = 'none'; return; }
+
+      panel.style.display = 'block';
+
+      if (state.chapters.length === 0) {
+        notice.style.display = 'flex';
+        list.style.display   = 'none';
+        return;
+      }
+
+      notice.style.display = 'none';
+      list.style.display   = 'flex';
+      list.innerHTML = '';
+      state.chapters.forEach(ch => {
+        const el = document.createElement('div');
+        el.className   = 'chapter-item';
+        el.textContent = ch.title;
+        list.appendChild(el);
+      });
     }
 
     // Build x-axis labels as book-position percentages
@@ -1013,6 +1164,9 @@
           },
           plugins: {
             legend: { display: false },
+            ...(annotationAvailable
+              ? { annotation: { annotations: buildChapterAnnotations() } }
+              : {}),
             tooltip: {
               backgroundColor: '#1c1c26',
               borderColor:     '#2a2a38',
@@ -1285,8 +1439,9 @@
     // Reset all state and UI when the user clicks "Change"
     changeFileBtn.addEventListener('click', e => {
       e.stopPropagation();
-      state.rawText = '';
-      state.windows = [];
+      state.rawText  = '';
+      state.windows  = [];
+      state.chapters = [];
       if (state.chart) { state.chart.destroy(); state.chart = null; }
       fileInput.value = '';
       hideFileInfo();
@@ -1294,6 +1449,7 @@
       hideProgress();
       disableWordSection();
       renderChart();
+      renderChapterPanel();
     });
 
     // ─────────────────────────────────────────────────────────────────
