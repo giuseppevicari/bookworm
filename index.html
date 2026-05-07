@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookworm — Narrative Frequency Visualizer</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    /* ── CSS Variables ───────────────────────────────────────────── */
+    :root {
+      --bg-primary:    #0e0e12;
+      --bg-secondary:  #16161d;
+      --bg-card:       #1c1c26;
+      --border:        #2a2a38;
+      --text-primary:  #e8e6f0;
+      --text-secondary:#8884a0;
+      --accent:        #7c6af7;
+      --accent-hover:  #9d8fff;
+      --success:       #4ade80;
+      --danger:        #f87171;
+      --font-heading:  'DM Serif Display', Georgia, serif;
+      --font-body:     'DM Sans', system-ui, sans-serif;
+      --font-mono:     'JetBrains Mono', monospace;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+    /* ── Subtle ambient background ───────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 15% 15%, rgba(124,106,247,0.05) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 85%, rgba(244,114,182,0.03) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .app-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 28px 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────── */
+    .site-header {
+      padding: 44px 0 28px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 48px;
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+    }
+
+    .site-header h1 {
+      font-family: var(--font-heading);
+      font-size: 2.6rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--text-primary);
+    }
+
+    .site-header h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .site-tagline {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    /* ── Card ────────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+    }
+
+    .card-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+    }
+
+    /* ── Main grid ───────────────────────────────────────────────── */
+    .main-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .top-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 700px) {
+      .top-row { grid-template-columns: 1fr; }
+      .site-header { flex-direction: column; gap: 6px; }
+    }
+
+    /* ── Upload zone ─────────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 44px 24px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 200ms ease, background 200ms ease;
+    }
+
+    .upload-zone:hover { border-color: var(--accent); background: rgba(124,106,247,0.03); }
+    .upload-zone.drag-over { border-color: var(--accent-hover); background: rgba(124,106,247,0.07); }
+
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 18px;
+      color: var(--accent);
+      opacity: 0.65;
+      display: block;
+    }
+
+    .upload-zone h3 {
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 400;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .upload-zone p {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+    }
+
+    .file-badges { display: inline-flex; gap: 8px; }
+
+    .file-badge {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 3px 9px;
+      border-radius: 4px;
+      background: rgba(124,106,247,0.1);
+      color: var(--accent);
+      border: 1px solid rgba(124,106,247,0.2);
+    }
+
+    /* ── Shimmer loading ─────────────────────────────────────────── */
+    .shimmer {
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-secondary);
+      border-radius: 6px;
+    }
+
+    .shimmer::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(124,106,247,0.07) 40%,
+        rgba(157,143,255,0.14) 50%,
+        rgba(124,106,247,0.07) 60%,
+        transparent 100%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.8s infinite ease-in-out;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+
+    /* ── Upload status / progress ────────────────────────────────── */
+    .upload-status { display: none; margin-top: 16px; }
+    .upload-status.visible { display: block; }
+
+    .progress-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 180ms ease;
+    }
+
+    .progress-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .shimmer-rows { display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── Error ───────────────────────────────────────────────────── */
+    .error-msg {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(248,113,113,0.07);
+      border: 1px solid rgba(248,113,113,0.22);
+      border-radius: 8px;
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--danger);
+    }
+    .error-msg.visible { display: flex; }
+
+    /* ── File info card (success) ────────────────────────────────── */
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      background: rgba(74,222,128,0.05);
+      border: 1px solid rgba(74,222,128,0.18);
+      border-radius: 10px;
+      margin-top: 14px;
+    }
+    .file-info.visible { display: flex; }
+
+    .file-info-icon {
+      width: 34px;
+      height: 34px;
+      background: rgba(74,222,128,0.12);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--success);
+      flex-shrink: 0;
+    }
+
+    .file-info-details { flex: 1; min-width: 0; }
+
+    .file-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-wordcount {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--success);
+      margin-top: 2px;
+    }
+
+    .change-btn {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-family: var(--font-body);
+      transition: border-color 150ms, color 150ms;
+      white-space: nowrap;
+    }
+    .change-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+
+    /* ── Word section ────────────────────────────────────────────── */
+    .word-section {
+      opacity: 0.35;
+      pointer-events: none;
+      transition: opacity 300ms ease;
+    }
+    .word-section.enabled { opacity: 1; pointer-events: all; }
+
+    .chip-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      min-height: 50px;
+      cursor: text;
+      transition: border-color 150ms ease;
+    }
+    .chip-wrapper:focus-within { border-color: var(--accent); }
+
+    .word-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px 3px 10px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 0.77rem;
+      font-weight: 500;
+      color: #0c0c10;
+      animation: chipIn 140ms ease forwards;
+      flex-shrink: 0;
+    }
+
+    @keyframes chipIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    .word-chip .chip-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: inherit;
+      opacity: 0.55;
+      line-height: 1;
+      font-size: 15px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      transition: opacity 120ms;
+    }
+    .word-chip .chip-remove:hover { opacity: 1; }
+
+    .chip-text-input {
+      flex: 1;
+      min-width: 140px;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-family: var(--font-body);
+      padding: 4px 2px;
+    }
+    .chip-text-input::placeholder { color: var(--text-secondary); }
+
+    .word-hint {
+      font-size: 0.73rem;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    kbd {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      background: var(--border);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--text-secondary);
+    }
+
+    /* ── Analyse button ──────────────────────────────────────────── */
+    .analyse-btn {
+      margin-top: 18px;
+      padding: 11px 26px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+    }
+    .analyse-btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(124,106,247,0.35);
+    }
+    .analyse-btn:active:not(:disabled) { transform: translateY(0); }
+    .analyse-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    /* ── Chart area ──────────────────────────────────────────────── */
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+    }
+
+    .chart-placeholder {
+      height: 380px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: var(--text-secondary);
+    }
+
+    .chart-placeholder svg { opacity: 0.25; }
+
+    .chart-placeholder p {
+      font-size: 0.82rem;
+      opacity: 0.55;
+    }
+
+    #mainChart { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- ── Header ──────────────────────────────────────────────── -->
+    <header class="site-header">
+      <h1>Book<em>worm</em></h1>
+      <span class="site-tagline">Narrative Frequency Visualizer</span>
+    </header>
+
+    <div class="main-grid">
+
+      <!-- ── Top row: Upload + Words ─────────────────────────── -->
+      <div class="top-row">
+
+        <!-- Upload card -->
+        <div class="card">
+          <div class="card-label">01 — Upload</div>
+
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept=".txt,.pdf">
+
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+
+            <h3>Drop your book here</h3>
+            <p>or click to browse your files</p>
+
+            <div class="file-badges">
+              <span class="file-badge">.txt</span>
+              <span class="file-badge">.pdf</span>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="upload-status" id="uploadStatus">
+            <div class="progress-track">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-label" id="progressLabel">Extracting text…</div>
+            <div class="shimmer-rows">
+              <div class="shimmer" style="height:13px;width:68%;"></div>
+              <div class="shimmer" style="height:13px;width:52%;"></div>
+              <div class="shimmer" style="height:13px;width:61%;"></div>
+            </div>
+          </div>
+
+          <!-- Error -->
+          <div class="error-msg" id="errorMsg">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="errorText"></span>
+          </div>
+
+          <!-- Success info -->
+          <div class="file-info" id="fileInfo">
+            <div class="file-info-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="file-info-details">
+              <div class="file-name" id="fileName"></div>
+              <div class="file-wordcount" id="wordCount"></div>
+            </div>
+            <button class="change-btn" id="changeFileBtn">Change</button>
+          </div>
+        </div>
+
+        <!-- Word input card -->
+        <div class="card">
+          <div class="card-label">02 — Track Words</div>
+          <div class="word-section" id="wordSection">
+            <div class="chip-wrapper" id="chipWrapper">
+              <input
+                type="text"
+                class="chip-text-input"
+                id="wordInput"
+                placeholder="Type a character or theme…"
+                autocomplete="off"
+                spellcheck="false"
+              >
+            </div>
+            <p class="word-hint">
+              Press <kbd>Enter</kbd> or <kbd>,</kbd> to add &nbsp;·&nbsp; Up to 8 words
+            </p>
+            <button class="analyse-btn" id="analyseBtn" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              Analyse
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Chart ────────────────────────────────────────────── -->
+      <div class="chart-card">
+        <div class="card-label">03 — Frequency Chart</div>
+        <div class="chart-placeholder" id="chartPlaceholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <p>Upload a file and add words to begin</p>
+        </div>
+        <canvas id="mainChart"></canvas>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────────
+    // STATE
+    // ─────────────────────────────────────────────────────────────────
+
+    const state = {
+      rawText:       '',
+      words:         [],
+      windows:       [],
+      chapters:      [],
+      windowSize:    500,
+      stepSize:      100,
+      chart:         null,
+      isAnimating:   false,
+      animationSpeed: 1,
+    };
+
+    const WORD_COLORS = [
+      '#7c6af7','#f472b6','#34d399','#fb923c',
+      '#60a5fa','#facc15','#a78bfa','#f43f5e',
+    ];
+
+    // ─────────────────────────────────────────────────────────────────
+    // PARSER
+    // ─────────────────────────────────────────────────────────────────
+
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Read a plain-text file and resolve with its string content
+    function parseTxt(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsText(file, 'UTF-8');
+      });
+    }
+
+    // Extract text from every page of a PDF, calling onProgress(0–1) each page
+    async function parsePdf(file, onProgress) {
+      const buffer = await file.arrayBuffer();
+      const pdf    = await pdfjsLib.getDocument({ data: buffer }).promise;
+      const total  = pdf.numPages;
+      const parts  = [];
+
+      for (let i = 1; i <= total; i++) {
+        const page    = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        parts.push(content.items.map(item => item.str).join(' '));
+        onProgress(i / total);
+      }
+
+      return parts.join('\n');
+    }
+
+    // Count whitespace-delimited words in a string
+    function countWords(text) {
+      return text.trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    // Validate extension, extract text, update state and UI
+    async function handleFile(file) {
+      hideError();
+      hideFileInfo();
+      hideProgress();
+
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext !== 'txt' && ext !== 'pdf') {
+        showError(`Unsupported format ".${ext}" — please upload a .txt or .pdf file.`);
+        return;
+      }
+
+      try {
+        let text;
+
+        if (ext === 'txt') {
+          showProgress('Reading file…', 0.3);
+          text = await parseTxt(file);
+          showProgress('Done', 1);
+        } else {
+          showProgress('Extracting pages… 0%', 0);
+          text = await parsePdf(file, pct => {
+            showProgress(`Extracting pages… ${Math.round(pct * 100)}%`, pct);
+          });
+        }
+
+        state.rawText = text;
+        hideProgress();
+        showFileInfo(file.name, countWords(text));
+        enableWordSection();
+
+      } catch (err) {
+        hideProgress();
+        showError(`Extraction failed: ${err.message}`);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ANALYSER  (stub — Phase 2)
+    // ─────────────────────────────────────────────────────────────────
+
+    // Run sliding window frequency analysis across state.rawText
+    function runAnalysis() {
+      // Phase 2
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CHART  (stub — Phase 2)
+    // ─────────────────────────────────────────────────────────────────
+
+    // Initialise and render the Chart.js frequency chart
+    function renderChart() {
+      // Phase 2
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // UI
+    // ─────────────────────────────────────────────────────────────────
+
+    const uploadZone   = document.getElementById('uploadZone');
+    const fileInput    = document.getElementById('fileInput');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel= document.getElementById('progressLabel');
+    const errorMsg     = document.getElementById('errorMsg');
+    const errorText    = document.getElementById('errorText');
+    const fileInfo     = document.getElementById('fileInfo');
+    const fileName     = document.getElementById('fileName');
+    const wordCount    = document.getElementById('wordCount');
+    const changeFileBtn= document.getElementById('changeFileBtn');
+    const wordSection  = document.getElementById('wordSection');
+    const chipWrapper  = document.getElementById('chipWrapper');
+    const wordInput    = document.getElementById('wordInput');
+    const analyseBtn   = document.getElementById('analyseBtn');
+
+    // Show the progress bar with a label and filled percentage (0–1)
+    function showProgress(msg, pct) {
+      uploadStatus.classList.add('visible');
+      progressFill.style.width = `${Math.round(pct * 100)}%`;
+      progressLabel.textContent = msg;
+    }
+
+    // Hide the progress bar
+    function hideProgress() {
+      uploadStatus.classList.remove('visible');
+    }
+
+    // Display an error message below the upload zone
+    function showError(msg) {
+      errorMsg.classList.add('visible');
+      errorText.textContent = msg;
+    }
+
+    // Hide the error message
+    function hideError() {
+      errorMsg.classList.remove('visible');
+    }
+
+    // Show the post-upload file summary card
+    function showFileInfo(name, words) {
+      fileInfo.classList.add('visible');
+      fileName.textContent = name;
+      wordCount.textContent = `${words.toLocaleString()} words extracted`;
+    }
+
+    // Hide the file summary card
+    function hideFileInfo() {
+      fileInfo.classList.remove('visible');
+    }
+
+    // Unlock the word input section after a file loads successfully
+    function enableWordSection() {
+      wordSection.classList.add('enabled');
+    }
+
+    // Lock the word input section and clear all chips
+    function disableWordSection() {
+      wordSection.classList.remove('enabled');
+      state.words = [];
+      renderChips();
+    }
+
+    // Return the palette color for a given word index (cycles if > 8)
+    function getWordColor(index) {
+      return WORD_COLORS[index % WORD_COLORS.length];
+    }
+
+    // Re-render all word chips inside the chip wrapper, preserving the text input
+    function renderChips() {
+      chipWrapper.querySelectorAll('.word-chip').forEach(el => el.remove());
+
+      state.words.forEach((w, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'word-chip';
+        chip.style.background = w.color;
+
+        const label = document.createElement('span');
+        label.textContent = w.word;
+
+        const btn = document.createElement('button');
+        btn.className = 'chip-remove';
+        btn.innerHTML = '×';
+        btn.title = `Remove "${w.word}"`;
+        btn.addEventListener('click', e => { e.stopPropagation(); removeWord(i); });
+
+        chip.appendChild(label);
+        chip.appendChild(btn);
+        chipWrapper.insertBefore(chip, wordInput);
+      });
+
+      updateAnalyseButton();
+    }
+
+    // Add a normalised word to state.words if valid and not duplicate
+    function addWord(raw) {
+      const word = raw.trim().toLowerCase();
+      if (!word || state.words.length >= 8) return;
+      if (state.words.some(w => w.word === word)) return;
+
+      state.words.push({ word, color: getWordColor(state.words.length), visible: true });
+      renderChips();
+    }
+
+    // Remove a word by index and reassign colors to maintain palette order
+    function removeWord(index) {
+      state.words.splice(index, 1);
+      state.words.forEach((w, i) => { w.color = getWordColor(i); });
+      renderChips();
+    }
+
+    // Enable or disable the Analyse button based on current word count
+    function updateAnalyseButton() {
+      analyseBtn.disabled = state.words.length === 0;
+    }
+
+    // Handle Enter / comma as word submission; Backspace to delete last chip
+    wordInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = wordInput.value.replace(/,/g, '').trim();
+        if (val) { addWord(val); wordInput.value = ''; }
+      } else if (e.key === 'Backspace' && wordInput.value === '' && state.words.length > 0) {
+        removeWord(state.words.length - 1);
+      }
+    });
+
+    // Handle pasting a comma-separated list of words
+    wordInput.addEventListener('paste', e => {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData).getData('text');
+      pasted.split(',').forEach(w => addWord(w));
+      wordInput.value = '';
+    });
+
+    // Clicking the chip wrapper focuses the hidden text input
+    chipWrapper.addEventListener('click', () => wordInput.focus());
+
+    // Analyse button triggers the sliding window analysis (Phase 2)
+    analyseBtn.addEventListener('click', () => {
+      if (state.words.length > 0) runAnalysis();
+    });
+
+    // Prevent browser default on dragover so drop fires
+    uploadZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      uploadZone.classList.add('drag-over');
+    });
+
+    // Remove drag-over highlight when cursor leaves
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('drag-over');
+    });
+
+    // Handle dropped file
+    uploadZone.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    // Handle file picked via the browse dialog
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    // Reset everything when the user clicks "Change"
+    changeFileBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      state.rawText = '';
+      fileInput.value = '';
+      hideFileInfo();
+      hideError();
+      hideProgress();
+      disableWordSection();
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    // EXPORT  (stub — Phase 7)
+    // ─────────────────────────────────────────────────────────────────
+
+    // Download the active chart view as a PNG file
+    function exportPng() { /* Phase 7 */ }
+
+    // Encode current settings as a shareable URL and copy to clipboard
+    function copyShareLink() { /* Phase 7 */ }
+
+  </script>
+</body>
+</html>
