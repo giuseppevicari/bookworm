@@ -32,6 +32,11 @@ Always verify that chartjs-plugin-annotation is compatible with the pinned Chart
 
 ---
 
+## Jira
+Always use Jira project key `BW` unless I specify otherwise.
+
+---
+
 ## Architecture
 
 Everything lives in `index.html`. Organise the code in this order inside the file:
@@ -60,6 +65,7 @@ const state = {
   words: [],            // array of { word, color, visible }
   windows: [],          // array of { offset, counts: { word: n } }
   chapters: [],         // array of { title, wordOffset }
+  wordCounts: {},       // total occurrence count per word in full text
   windowSize: 500,      // words per window (user-adjustable)
   stepSize: 100,        // words per step (user-adjustable)
   chart: null,          // Chart.js instance
@@ -141,6 +147,14 @@ Complete and test each phase before starting the next. Do not skip ahead.
 - Show a toast notification ("Link copied!") on successful copy
 - Shareable URL does not include book text — user must re-upload
 
+### Post-Phase Additions
+
+**Word count badges (in chips):** After analysis runs, each word chip shows a small badge with the total occurrence count across the full text. Stored in `state.wordCounts`.
+
+**Exact match toggle:** Checkbox in the "02 — Track Words" card, positioned directly below the word input field. When on (default), uses `\b` word-boundary regex so "book" won't match "bookworm". When off, uses substring matching. Re-runs analysis on toggle if results already exist.
+
+**Word stats bar:** A bar rendered above the frequency chart (below the animation toolbar) after analysis runs. Shows one pill per tracked word with: color swatch, word label, total count, and percentage of total words. Hidden until analysis completes. Element ID: `wordStatsBar`, CSS class: `word-stats-bar` / `word-stats-bar visible`.
+
 ---
 
 ## Design System
@@ -213,9 +227,12 @@ Complete and test each phase before starting the next. Do not skip ahead.
 bookworm/
 ├── CLAUDE.md          ← this file
 ├── index.html         ← the entire application
+├── .github/
+│   └── workflows/
+│       ├── claude.yml                  ← Claude PR Assistant
+│       └── claude-code-review.yml      ← Claude Code Review on PRs
 └── test/
-    ├── pride.txt      ← Pride and Prejudice (from Project Gutenberg)
-    └── moby.txt       ← Moby Dick (from Project Gutenberg)
+    └── alice.txt      ← Alice's Adventures in Wonderland (from Project Gutenberg)
 ```
 
 Keep test files in the `test/` folder. They are not part of the deliverable.
