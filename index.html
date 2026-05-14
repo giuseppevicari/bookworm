@@ -886,60 +886,17 @@
       color: var(--text-secondary);
     }
 
-    /* ── Animation toolbar ───────────────────────────────────────── */
-    .anim-toolbar {
+    /* ── Chart controls ──────────────────────────────────────────── */
+    .chart-controls {
       display: none;
       align-items: center;
       gap: 12px;
-      padding: 9px 14px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
+      margin-bottom: 10px;
     }
 
-    .anim-toolbar.visible { display: flex; }
+    .chart-controls.visible { display: flex; }
 
-    .play-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: var(--accent);
-      border: none;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      flex-shrink: 0;
-      transition: background 150ms, transform 150ms;
-    }
-
-    .play-btn:hover { background: var(--accent-hover); transform: scale(1.08); }
-
-    .anim-speed-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 1;
-      min-width: 120px;
-    }
-
-    .anim-label {
-      font-size: 0.72rem;
-      color: var(--text-secondary);
-      white-space: nowrap;
-    }
-
-    .anim-speed-val {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-primary);
-      min-width: 44px;
-    }
-
-    .loop-toggle-label {
+    .chart-toggle-label {
       display: flex;
       align-items: center;
       gap: 6px;
@@ -949,7 +906,7 @@
       user-select: none;
     }
 
-    .loop-toggle-label input { cursor: pointer; accent-color: var(--accent); }
+    .chart-toggle-label input { cursor: pointer; accent-color: var(--accent); }
 
     .exact-match-row {
       display: flex;
@@ -976,14 +933,6 @@
       font-size: 0.68rem;
       color: var(--text-secondary);
       opacity: 0.5;
-    }
-
-    .anim-pct {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-secondary);
-      min-width: 36px;
-      text-align: right;
     }
 
     /* ── Heatmap ─────────────────────────────────────────────────── */
@@ -1224,23 +1173,11 @@
           <!-- Frequency view -->
           <div id="frequencyView">
 
-            <!-- Animation toolbar (visible when chart has data) -->
-            <div class="anim-toolbar" id="animToolbar">
-              <button class="play-btn" id="playBtn" title="Play animation">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-              </button>
-              <div class="anim-speed-group">
-                <span class="anim-label">Speed</span>
-                <input type="range" id="speedSlider" min="1" max="3" step="1" value="1">
-                <span class="anim-speed-val" id="speedLabel">Slow</span>
-              </div>
-              <label class="loop-toggle-label">
-                <input type="checkbox" id="loopToggle"> Loop
-              </label>
-              <label class="loop-toggle-label">
+            <!-- Chart controls (visible when chart has data) -->
+            <div class="chart-controls" id="chartControls">
+              <label class="chart-toggle-label">
                 <input type="checkbox" id="chapterLabelsToggle" checked> Chapter labels
               </label>
-              <span class="anim-pct" id="animPct">0%</span>
             </div>
 
             <!-- Word count stats bar (shown after analysis) -->
@@ -1331,11 +1268,6 @@
       wordCounts:       {},   // total occurrence count per word in full text
       chart:            null,
       showChapterLabels: true,
-      isAnimating:      false,
-      animationSpeed:   1,    // 1=slow, 2=medium, 3=fast
-      animVisibleCount: 0,    // data points visible during animation (0 = show all)
-      animRafId:        null, // requestAnimationFrame handle
-      animLoopEnabled:  false,
       activeTab:        'frequency', // 'frequency' | 'heatmap'
     };
 
@@ -1734,7 +1666,7 @@
         placeholder.style.display = 'flex';
         wrapper.classList.remove('visible');
         document.getElementById('chartLegend').innerHTML = '';
-        hideAnimToolbar();
+        document.getElementById('chartControls').classList.remove('visible');
         return;
       }
 
@@ -1811,14 +1743,7 @@
         },
       });
 
-      // Reset animation state whenever a fresh chart is rendered
-      if (state.animRafId) { cancelAnimationFrame(state.animRafId); state.animRafId = null; }
-      state.isAnimating      = false;
-      state.animVisibleCount = state.windows.length;
-      showAnimToolbar();
-      syncPlayBtn();
-      syncAnimPct();
-
+      document.getElementById('chartControls').classList.add('visible');
       renderLegend();
     }
 
@@ -2191,147 +2116,6 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReadingPanel(); });
 
     // ─────────────────────────────────────────────────────────────────
-    // ANIMATION  (Phase 5)
-    // ─────────────────────────────────────────────────────────────────
-
-    const SPEED_LABELS = { 1: 'Slow', 2: 'Medium', 3: 'Fast' };
-
-    // Data points to advance per second at each speed setting
-    function animDpsForSpeed() {
-      const total = state.windows.length || 1;
-      switch (state.animationSpeed) {
-        case 1: return total / 30;
-        case 2: return total / 15;
-        case 3: return total / 5;
-        default: return total / 15;
-      }
-    }
-
-    // Show or hide the animation toolbar
-    function showAnimToolbar() {
-      document.getElementById('animToolbar').classList.add('visible');
-    }
-
-    function hideAnimToolbar() {
-      document.getElementById('animToolbar').classList.remove('visible');
-    }
-
-    // Sync the play/pause button icon to current state
-    function syncPlayBtn() {
-      const btn = document.getElementById('playBtn');
-      if (state.isAnimating) {
-        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-        </svg>`;
-        btn.title = 'Pause';
-      } else {
-        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="5,3 19,12 5,21"/>
-        </svg>`;
-        btn.title = 'Play animation';
-      }
-    }
-
-    // Sync the percentage label
-    function syncAnimPct() {
-      const pct = state.windows.length > 0
-        ? Math.round((state.animVisibleCount / state.windows.length) * 100)
-        : 0;
-      document.getElementById('animPct').textContent = `${pct}%`;
-    }
-
-    // Slice chart data to state.animVisibleCount points and update playhead annotation
-    function applyAnimFrame() {
-      if (!state.chart) return;
-      const n = state.animVisibleCount;
-      state.chart.data.labels   = buildLabels().slice(0, n);
-      state.chart.data.datasets = buildDatasets().map(ds => ({ ...ds, data: ds.data.slice(0, n) }));
-
-      if (annotationAvailable) {
-        state.chart.options.plugins.annotation.clip = false;
-        state.chart.options.plugins.annotation.annotations = {
-          ...buildChapterAnnotations(),
-          playhead: {
-            type: 'line',
-            xMin: n - 1, xMax: n - 1,
-            borderColor: 'rgba(124,106,247,0.65)',
-            borderWidth: 2,
-            label: { display: false },
-          },
-        };
-      }
-      state.chart.update('none');
-    }
-
-    // Restore chart to full dataset and remove playhead
-    function restoreFullChart() {
-      if (!state.chart) return;
-      state.chart.data.labels   = buildLabels();
-      state.chart.data.datasets = buildDatasets();
-      if (annotationAvailable) {
-        state.chart.options.plugins.annotation.clip = false;
-        state.chart.options.plugins.annotation.annotations = buildChapterAnnotations();
-      }
-      state.chart.update('none');
-    }
-
-    // Start or resume animation
-    function playAnimation() {
-      if (!state.windows.length) return;
-      if (state.animVisibleCount >= state.windows.length) {
-        state.animVisibleCount = 1;
-        applyAnimFrame();
-      }
-      state.isAnimating = true;
-      syncPlayBtn();
-
-      let lastTs   = null;
-      let fraction = 0; // sub-step accumulator so slow speeds work correctly
-
-      function tick(ts) {
-        if (!state.isAnimating) return;
-        if (!lastTs) lastTs = ts;
-        const delta = Math.min(ts - lastTs, 100); // clamp to avoid jump after tab switch
-        lastTs = ts;
-
-        fraction += animDpsForSpeed() * delta / 1000;
-        const inc = Math.floor(fraction);
-        if (inc >= 1) {
-          fraction -= inc;
-          state.animVisibleCount = Math.min(state.windows.length, state.animVisibleCount + inc);
-          applyAnimFrame();
-          syncAnimPct();
-        }
-
-        if (state.animVisibleCount < state.windows.length) {
-          state.animRafId = requestAnimationFrame(tick);
-        } else {
-          state.isAnimating = false;
-          state.animRafId   = null;
-          syncPlayBtn();
-          syncAnimPct();
-          if (state.animLoopEnabled) {
-            setTimeout(() => {
-              if (state.animLoopEnabled && !state.isAnimating) {
-                state.animVisibleCount = 1;
-                playAnimation();
-              }
-            }, 600);
-          }
-        }
-      }
-
-      state.animRafId = requestAnimationFrame(tick);
-    }
-
-    // Pause animation mid-way
-    function pauseAnimation() {
-      state.isAnimating = false;
-      if (state.animRafId) { cancelAnimationFrame(state.animRafId); state.animRafId = null; }
-      syncPlayBtn();
-    }
-
-    // ─────────────────────────────────────────────────────────────────
     // HEATMAP  (Phase 6)
     // ─────────────────────────────────────────────────────────────────
 
@@ -2564,23 +2348,6 @@
       document.getElementById('chartLegend').style.display  = tab === 'frequency' ? '' : 'none';
       if (tab === 'heatmap') renderHeatmap();
     }
-
-    // Play/pause
-    document.getElementById('playBtn').addEventListener('click', () => {
-      if (state.isAnimating) pauseAnimation();
-      else playAnimation();
-    });
-
-    // Speed slider
-    document.getElementById('speedSlider').addEventListener('input', function () {
-      state.animationSpeed = parseInt(this.value);
-      document.getElementById('speedLabel').textContent = SPEED_LABELS[state.animationSpeed];
-    });
-
-    // Loop toggle
-    document.getElementById('loopToggle').addEventListener('change', function () {
-      state.animLoopEnabled = this.checked;
-    });
 
     // Chapter labels toggle
     document.getElementById('chapterLabelsToggle').addEventListener('change', function () {
