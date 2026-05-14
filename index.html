@@ -1237,6 +1237,9 @@
               <label class="loop-toggle-label">
                 <input type="checkbox" id="loopToggle"> Loop
               </label>
+              <label class="loop-toggle-label">
+                <input type="checkbox" id="chapterLabelsToggle" checked> Chapter labels
+              </label>
               <span class="anim-pct" id="animPct">0%</span>
             </div>
 
@@ -1327,6 +1330,7 @@
       exactMatch:       true, // when true, "book" won't match "bookworm"
       wordCounts:       {},   // total occurrence count per word in full text
       chart:            null,
+      showChapterLabels: true,
       isAnimating:      false,
       animationSpeed:   1,    // 1=slow, 2=medium, 3=fast
       animVisibleCount: 0,    // data points visible during animation (0 = show all)
@@ -1636,12 +1640,12 @@
           borderWidth: 1,
           borderDash: [4, 4],
           label: {
-            display: true,
+            display: state.showChapterLabels,
             content: ch.title,
             rotation: -90,
-            position: 'start',
-            yAdjust: 8,
-            color: 'rgba(136,132,160,0.75)',
+            position: 'end',
+            yAdjust: 6,
+            color: 'rgba(136,132,160,0.9)',
             font: { family: "'DM Sans'", size: 9 },
             backgroundColor: 'transparent',
             padding: { x: 2, y: 2 },
@@ -2539,6 +2543,15 @@
     // Loop toggle
     document.getElementById('loopToggle').addEventListener('change', function () {
       state.animLoopEnabled = this.checked;
+    });
+
+    // Chapter labels toggle
+    document.getElementById('chapterLabelsToggle').addEventListener('change', function () {
+      state.showChapterLabels = this.checked;
+      if (state.chart && annotationAvailable) {
+        state.chart.options.plugins.annotation.annotations = buildChapterAnnotations();
+        state.chart.update('none');
+      }
     });
 
     // Export and share
