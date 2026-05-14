@@ -382,6 +382,16 @@
     }
     .word-chip .chip-remove:hover { opacity: 1; }
 
+    .chip-count {
+      font-family: var(--font-mono);
+      font-size: 0.63rem;
+      opacity: 0.6;
+      background: rgba(0,0,0,0.22);
+      padding: 1px 5px;
+      border-radius: 999px;
+      letter-spacing: 0.01em;
+    }
+
     .chip-text-input {
       flex: 1;
       min-width: 140px;
@@ -900,6 +910,33 @@
 
     .loop-toggle-label input { cursor: pointer; accent-color: var(--accent); }
 
+    .exact-match-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .exact-match-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .exact-match-label input { cursor: pointer; accent-color: var(--accent); }
+
+    .exact-match-hint {
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      opacity: 0.5;
+    }
+
     .anim-pct {
       font-family: var(--font-mono);
       font-size: 0.72rem;
@@ -1082,6 +1119,15 @@
                 <input type="range" id="stepSlider" min="50" max="500" step="50" value="100">
               </div>
             </div>
+
+            <!-- Exact match toggle -->
+            <div class="exact-match-row">
+              <label class="exact-match-label">
+                <input type="checkbox" id="exactMatchToggle" checked>
+                Exact word match
+              </label>
+              <span class="exact-match-hint">"book" won't match "bookworm" when on</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1234,6 +1280,8 @@
       wordCharMap:      [],   // char offset of each whitespace-split word in rawText
       windowSize:       500,
       stepSize:         100,
+      exactMatch:       true, // when true, "book" won't match "bookworm"
+      wordCounts:       {},   // total occurrence count per word in full text
       chart:            null,
       isAnimating:      false,
       animationSpeed:   1,    // 1=slow, 2=medium, 3=fast
@@ -1342,7 +1390,7 @@
     }
 
     // Slide a window across tokens, counting tracked words; yields to keep UI responsive
-    async function computeWindows(tokens, words, windowSize, stepSize, onProgress) {
+    async function computeWindows(tokens, words, windowSize, stepSize, exactMatch, onProgress) {
       const results  = [];
       const wordList = words.map(w => w.word);
       const wordSet  = new Set(wordList);
@@ -1356,7 +1404,14 @@
         wordList.forEach(w => { counts[w] = 0; });
 
         for (let j = start; j < start + windowSize; j++) {
-          if (wordSet.has(tokens[j])) counts[tokens[j]]++;
+          const tok = tokens[j];
+          if (exactMatch) {
+            if (wordSet.has(tok)) counts[tok]++;
+          } else {
+            for (const w of wordList) {
+              if (tok.includes(w)) counts[w]++;
+            }
+          }
         }
 
         results.push({ offset: start, counts });
@@ -1427,6 +1482,20 @@
       const effectiveWindow = Math.min(state.windowSize, tokens.length);
       const effectiveStep   = Math.min(state.stepSize, effectiveWindow);
 
+      // Count total occurrences per word in the full token list
+      const wordCounts = {};
+      for (const w of state.words) wordCounts[w.word] = 0;
+      if (state.exactMatch) {
+        const wSet = new Set(state.words.map(w => w.word));
+        for (const t of tokens) { if (wSet.has(t)) wordCounts[t]++; }
+      } else {
+        for (const t of tokens) {
+          for (const w of state.words) { if (t.includes(w.word)) wordCounts[w.word]++; }
+        }
+      }
+      state.wordCounts = wordCounts;
+      renderChips();
+
       showAnalysisProgress(
         `Analysing "${state.words.map(w => w.word).join(', ')}"…`
       );
@@ -1437,6 +1506,7 @@
         state.words,
         effectiveWindow,
         effectiveStep,
+        state.exactMatch,
         pct => setAnalysisProgress(0.04 + pct * 0.96)
       );
 
@@ -1777,15 +1847,23 @@
 
         const label = document.createElement('span');
         label.textContent = w.word;
+        chip.appendChild(label);
+
+        // Show total occurrence count if analysis has been run
+        if (state.wordCounts[w.word] !== undefined) {
+          const countBadge = document.createElement('span');
+          countBadge.className = 'chip-count';
+          countBadge.textContent = state.wordCounts[w.word].toLocaleString();
+          chip.appendChild(countBadge);
+        }
 
         const btn = document.createElement('button');
         btn.className = 'chip-remove';
         btn.innerHTML = '×';
         btn.title = `Remove "${w.word}"`;
         btn.addEventListener('click', e => { e.stopPropagation(); removeWord(i); });
-
-        chip.appendChild(label);
         chip.appendChild(btn);
+
         chipWrapper.insertBefore(chip, wordInput);
       });
 
@@ -1862,6 +1940,12 @@
 
     // Re-run analysis when step size is committed
     stepSlider.addEventListener('change', () => {
+      if (state.windows.length > 0) runAnalysis();
+    });
+
+    // Toggle exact word matching; re-run if results already exist
+    document.getElementById('exactMatchToggle').addEventListener('change', function () {
+      state.exactMatch = this.checked;
       if (state.windows.length > 0) runAnalysis();
     });
 
@@ -1951,13 +2035,15 @@
         .map(w => w.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
         .join('|');
 
-      return escaped.replace(
-        new RegExp(`\\b(${pattern})\\b`, 'gi'),
-        (match) => {
-          const color = wordMap[match.toLowerCase()] || '';
-          return `<mark style="background:${color}22;color:${color};border-radius:3px;padding:0 2px;">${match}</mark>`;
-        }
-      );
+      const re = state.exactMatch
+        ? new RegExp(`\\b(${pattern})\\b`, 'gi')
+        : new RegExp(`(${pattern})`, 'gi');
+
+      return escaped.replace(re, (match) => {
+        const color = wordMap[match.toLowerCase()] ||
+          Object.entries(wordMap).find(([k]) => match.toLowerCase().includes(k))?.[1] || '';
+        return `<mark style="background:${color}22;color:${color};border-radius:3px;padding:0 2px;">${match}</mark>`;
+      });
     }
 
     // Populate and show the reading panel for the given window index
@@ -2297,6 +2383,7 @@
         words:  state.words.map(w => w.word).join(','),
         window: state.windowSize,
         step:   state.stepSize,
+        exact:  state.exactMatch ? '1' : '0',
       });
       const url = `${location.origin}${location.pathname}?${params}`;
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2325,7 +2412,7 @@
     // Parse URL query params on load and pre-populate word chips + sliders
     function parseUrlParams() {
       const p = new URLSearchParams(location.search);
-      const w = p.get('window'), s = p.get('step'), words = p.get('words');
+      const w = p.get('window'), s = p.get('step'), words = p.get('words'), exact = p.get('exact');
       if (w) {
         const v = parseInt(w);
         if (v >= 100 && v <= 2000) {
@@ -2341,6 +2428,10 @@
           stepSlider.value = v;
           stepVal.textContent = v;
         }
+      }
+      if (exact !== null) {
+        state.exactMatch = exact !== '0';
+        document.getElementById('exactMatchToggle').checked = state.exactMatch;
       }
       if (words) words.split(',').filter(Boolean).forEach(w => addWord(w.trim()));
     }
