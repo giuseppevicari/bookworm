@@ -1749,7 +1749,7 @@
           plugins: {
             legend: { display: false },
             ...(annotationAvailable
-              ? { annotation: { annotations: buildChapterAnnotations() } }
+              ? { annotation: { clip: false, annotations: buildChapterAnnotations() } }
               : {}),
             tooltip: {
               backgroundColor: '#1c1c26',
@@ -2209,6 +2209,7 @@
       state.chart.data.datasets = buildDatasets().map(ds => ({ ...ds, data: ds.data.slice(0, n) }));
 
       if (annotationAvailable) {
+        state.chart.options.plugins.annotation.clip = false;
         state.chart.options.plugins.annotation.annotations = {
           ...buildChapterAnnotations(),
           playhead: {
@@ -2229,6 +2230,7 @@
       state.chart.data.labels   = buildLabels();
       state.chart.data.datasets = buildDatasets();
       if (annotationAvailable) {
+        state.chart.options.plugins.annotation.clip = false;
         state.chart.options.plugins.annotation.annotations = buildChapterAnnotations();
       }
       state.chart.update('none');
