@@ -1487,11 +1487,11 @@
     function detectChapters(text) {
       const WRITTEN = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve' +
         '|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty';
-      // Roman numerals — require ≥2 meaningful chars to avoid matching lone "I"
-      const ROMAN = 'M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|VI{0,3}|I{2,3}|V)';
+      // Roman numerals — lookahead ensures at least one numeral char; \b prevents matching into words
+      const ROMAN = '(?=[MDCLXVI])M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})\\b';
       const pats = [
-        new RegExp(`^chapter[\\t ]+(?:[0-9]+|${WRITTEN}|${ROMAN})(?:[^\\n]{0,80})?`, 'gim'),
-        new RegExp(`^(?:part|book)[\\t ]+(?:[0-9]+|${ROMAN}|${WRITTEN})(?:[^\\n]{0,80})?`, 'gim'),
+        new RegExp(`^chapter[\\t ]+(?:[0-9]+|${WRITTEN}|${ROMAN})(?!\\w)(?:[^\\n]{0,80})?`, 'gim'),
+        new RegExp(`^(?:part|book)[\\t ]+(?:[0-9]+|${ROMAN}|${WRITTEN})(?!\\w)(?:[^\\n]{0,80})?`, 'gim'),
         /^(?:prologue|epilogue|afterword|introduction)(?:[^\n]{0,80})?/gim,
       ];
 
@@ -1504,11 +1504,11 @@
 
       raw.sort((a, b) => a.charPos - b.charPos);
 
-      // Deduplicate matches within 50 characters of each other
+      // Deduplicate matches at the same position (different patterns can't overlap, threshold is just a buffer)
       const seen = [];
       let lastPos = -999;
       for (const r of raw) {
-        if (r.charPos - lastPos > 50) { seen.push(r); lastPos = r.charPos; }
+        if (r.charPos - lastPos > 5) { seen.push(r); lastPos = r.charPos; }
       }
 
       return seen.map(r => ({
@@ -1603,6 +1603,51 @@
       }
     } catch (_) {}
 
+    // Custom plugin: draws chapter labels above the chart area using canvas 2D API
+    const chapterLabelPlugin = {
+      id: 'chapterLabels',
+      afterDraw(chart) {
+        if (!state.showChapterLabels || !state.chapters.length || !state.windows.length) return;
+        const { ctx, chartArea, scales } = chart;
+        const xScale = scales.x;
+
+        ctx.save();
+        ctx.font = "500 11px 'DM Sans', sans-serif";
+        ctx.fillStyle = 'rgba(200,196,220,0.92)';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+
+        // Stagger labels into two rows when chapters are very close together
+        let lastXPx = -Infinity;
+        let stagger = false;
+        const STAGGER = 22; // extra px further into the padding zone for the second row
+        const MIN_GAP = 70; // min pixel gap before staggering kicks in
+
+        state.chapters.forEach(ch => {
+          let closest = 0, minDiff = Infinity;
+          state.windows.forEach((win, idx) => {
+            const d = Math.abs(win.offset - ch.wordOffset);
+            if (d < minDiff) { minDiff = d; closest = idx; }
+          });
+          const xPx = xScale.getPixelForValue(closest);
+
+          stagger = (xPx - lastXPx) < MIN_GAP ? !stagger : false;
+          lastXPx = xPx;
+
+          // After ctx.rotate(-Math.PI/2): +x in rotated space = upward in canvas.
+          // textAlign='left' + positive x offset draws text upward into the padding zone.
+          ctx.save();
+          ctx.translate(xPx, chartArea.top - 2);
+          ctx.rotate(-Math.PI / 2);
+          ctx.fillText(ch.title, 5 + (stagger ? STAGGER : 0), 0);
+          ctx.restore();
+        });
+
+        ctx.restore();
+      }
+    };
+    Chart.register(chapterLabelPlugin);
+
     // Build Chart.js dataset objects from current state.words and state.windows
     function buildDatasets() {
       return state.words.map(w => ({
@@ -1639,17 +1684,6 @@
           borderColor: 'rgba(255,255,255,0.18)',
           borderWidth: 1,
           borderDash: [4, 4],
-          label: {
-            display: state.showChapterLabels,
-            content: ch.title,
-            rotation: -90,
-            position: 'end',
-            yAdjust: 6,
-            color: 'rgba(136,132,160,0.9)',
-            font: { family: "'DM Sans'", size: 9 },
-            backgroundColor: 'transparent',
-            padding: { x: 2, y: 2 },
-          },
         };
       });
       return annotations;
@@ -1724,6 +1758,7 @@
           responsive:          true,
           maintainAspectRatio: false,
           animation:           { duration: 350 },
+          layout:              { padding: { top: 90 } },
           interaction:         { mode: 'index', intersect: false },
           onClick: (event, elements, chart) => {
             const pts = chart.getElementsAtEventForMode(event, 'index', { intersect: false }, true);
@@ -2550,10 +2585,7 @@
     // Chapter labels toggle
     document.getElementById('chapterLabelsToggle').addEventListener('change', function () {
       state.showChapterLabels = this.checked;
-      if (state.chart && annotationAvailable) {
-        state.chart.options.plugins.annotation.annotations = buildChapterAnnotations();
-        state.chart.update('none');
-      }
+      if (state.chart) state.chart.update('none');
     });
 
     // Export and share
