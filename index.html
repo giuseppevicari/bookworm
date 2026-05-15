@@ -896,6 +896,49 @@
 
     .chart-controls.visible { display: flex; }
 
+    /* ── Zoom controls ───────────────────────────────────────────── */
+    .zoom-controls {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .zoom-controls.visible { display: flex; }
+
+    .zoom-row, .pan-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .zoom-label {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      min-width: 58px;
+    }
+
+    .zoom-reset-btn {
+      font-family: var(--font-body);
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 10px;
+      cursor: pointer;
+      transition: color 150ms, border-color 150ms;
+      white-space: nowrap;
+    }
+
+    .zoom-reset-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+    #panRow { display: none; }
+    #panRow.visible { display: flex; }
+
     .chart-toggle-label {
       display: flex;
       align-items: center;
@@ -1196,6 +1239,20 @@
               <canvas id="mainChart"></canvas>
             </div>
 
+            <!-- Zoom and pan controls (shown when chart has data) -->
+            <div class="zoom-controls" id="zoomControls">
+              <div class="zoom-row">
+                <span class="zoom-label">Zoom</span>
+                <input type="range" id="zoomSlider" min="1" max="20" step="1" value="1">
+                <span class="slider-val" id="zoomVal">1×</span>
+                <button class="zoom-reset-btn" id="zoomResetBtn">Reset</button>
+              </div>
+              <div class="pan-row" id="panRow">
+                <span class="zoom-label">Position</span>
+                <input type="range" id="panSlider" min="0" max="100" step="1" value="0">
+              </div>
+            </div>
+
           </div>
 
           <!-- Heatmap view -->
@@ -1269,6 +1326,8 @@
       chart:            null,
       showChapterLabels: true,
       activeTab:        'frequency', // 'frequency' | 'heatmap'
+      zoomLevel:        1,
+      zoomOffset:       0,           // pan position as % (0–100)
     };
 
     const WORD_COLORS = [
@@ -1666,6 +1725,7 @@
         wrapper.classList.remove('visible');
         document.getElementById('chartLegend').innerHTML = '';
         document.getElementById('chartControls').classList.remove('visible');
+        document.getElementById('zoomControls').classList.remove('visible');
         return;
       }
 
@@ -1743,6 +1803,8 @@
       });
 
       document.getElementById('chartControls').classList.add('visible');
+      document.getElementById('zoomControls').classList.add('visible');
+      resetZoom();
       renderLegend();
     }
 
@@ -1772,6 +1834,37 @@
         btn.addEventListener('click', () => toggleWordVisibility(i));
         legend.appendChild(btn);
       });
+    }
+
+    // Apply current zoom and pan state to the chart x-axis
+    function applyZoom() {
+      if (!state.chart) return;
+      const total  = state.windows.length;
+      const panRow = document.getElementById('panRow');
+
+      if (state.zoomLevel <= 1) {
+        state.chart.options.scales.x.min = undefined;
+        state.chart.options.scales.x.max = undefined;
+        panRow.classList.remove('visible');
+      } else {
+        const visibleCount = Math.max(2, Math.ceil(total / state.zoomLevel));
+        const maxStart     = Math.max(0, total - visibleCount);
+        const start        = Math.round((state.zoomOffset / 100) * maxStart);
+        state.chart.options.scales.x.min = start;
+        state.chart.options.scales.x.max = start + visibleCount - 1;
+        panRow.classList.add('visible');
+      }
+      state.chart.update('none');
+    }
+
+    // Reset zoom and pan sliders to the default full-view state
+    function resetZoom() {
+      state.zoomLevel  = 1;
+      state.zoomOffset = 0;
+      document.getElementById('zoomSlider').value = 1;
+      document.getElementById('zoomVal').textContent = '1×';
+      document.getElementById('panSlider').value = 0;
+      applyZoom();
     }
 
     // Show or hide a single word's dataset on the chart
@@ -2353,6 +2446,22 @@
       state.showChapterLabels = this.checked;
       if (state.chart) state.chart.update('none');
     });
+
+    // Zoom level slider — update display and apply to chart
+    document.getElementById('zoomSlider').addEventListener('input', e => {
+      state.zoomLevel = Number(e.target.value);
+      document.getElementById('zoomVal').textContent = `${state.zoomLevel}×`;
+      applyZoom();
+    });
+
+    // Pan position slider — scroll through the zoomed window
+    document.getElementById('panSlider').addEventListener('input', e => {
+      state.zoomOffset = Number(e.target.value);
+      applyZoom();
+    });
+
+    // Reset zoom back to full view
+    document.getElementById('zoomResetBtn').addEventListener('click', resetZoom);
 
     // Export and share
     document.getElementById('exportBtn').addEventListener('click', exportPng);
