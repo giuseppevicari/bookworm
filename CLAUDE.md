@@ -26,6 +26,7 @@ Update this file when new decisions are made.
 | Chart.js | 4.4.3 | jsDelivr (cdnjs blocked by ORB due to `Chart.js` path) |
 | chartjs-plugin-annotation | 3.0.1 | jsDelivr |
 | PDF.js | 3.11.174 | cdnjs |
+| D3.js | 7 (latest) | jsDelivr (`d3@7/dist/d3.min.js`) |
 
 Load all libraries from CDN in the `<head>`. Do not use npm, bundlers, or local files.
 Always verify that chartjs-plugin-annotation is compatible with the pinned Chart.js version before writing chart code.
@@ -164,6 +165,8 @@ Complete and test each phase before starting the next. Do not skip ahead.
 **Chapter labels on chart (canvas plugin):** Chapter labels are rendered above the chart area using a custom Chart.js `afterDraw` plugin (`chapterLabelPlugin`), NOT via chartjs-plugin-annotation labels. The plugin draws rotated text directly onto the canvas above `chartArea.top`. Chart options must include `layout.padding.top: 90` to reserve space for the labels. A toggle checkbox (`#chapterLabelsToggle`) sets `state.showChapterLabels` and calls `chart.update('none')`. See pitfall #9.
 
 **Zoom and pan controls (BW-8):** A `#zoomControls` div lives inside `#frequencyView` immediately below `#chartWrapper`. It contains a Zoom slider (`#zoomSlider`, 1×–20×) and a Position pan slider (`#panRow` / `#panSlider`, 0–100%). `applyZoom()` sets `chart.options.scales.x.min/max` and calls `chart.update('none')`. The pan row is hidden (`display:none`) when zoom is 1×. `resetZoom()` restores both sliders to defaults and clears `min/max`. `renderChart()` calls `resetZoom()` on every new analysis so the view always starts full-width.
+
+**Semantic Network tab (BW-6):** A third tab `#tabNetwork` alongside Frequency and Heatmap. Renders a D3 v7 force-directed SVG graph in `#networkSvg`. The `buildCoOccurrences(term, contextRadius=10)` function scans all positions of `term` in the tokenized text and counts words within ±10 tokens, excluding stop words (constant `STOP_WORDS` Set) and the search term itself. Returns the top 20 by count. `renderNetwork(term, termCount, related)` builds the D3 simulation: central node (radius 22 px), related nodes sized by `networkNodeRadius()`, edge width by co-occurrence strength. Fixed-position tooltip appended to `<body>` on mouseenter, removed on re-render. Clicking a related node calls `generateNetwork(word)` to recenter. Export PNG shows a toast and does nothing on the Network tab (SVG-to-PNG export not supported).
 
 ---
 
