@@ -64,7 +64,7 @@ const state = {
   rawText: '',            // full extracted text string
   words: [],              // array of { word, color, visible }
   windows: [],            // array of { offset, counts: { word: n } }
-  chapters: [],           // array of { title, wordOffset }
+  chapters: [],           // array of { title, wordOffset, windowIdx }
   wordCounts: {},         // total occurrence count per word in full text
   wordCharMap: [],        // char offsets of every whitespace-delimited word (for excerpt lookup)
   showChapterLabels: true,// toggle for chapter label visibility on chart
@@ -72,14 +72,11 @@ const state = {
   stepSize: 100,          // words per step (user-adjustable)
   exactMatch: true,       // true = \b word boundary; false = substring match
   chart: null,            // Chart.js instance
-  isAnimating: false,     // animation play state
-  animationSpeed: 1,      // 1=slow, 2=medium, 3=fast
-  animVisibleCount: 0,    // number of data points currently visible in animation
-  animRafId: null,        // requestAnimationFrame handle
-  animLoopEnabled: false, // loop animation back to start when complete
   activeTab: 'frequency', // 'frequency' | 'heatmap'
 };
 ```
+
+`chapters[n].windowIdx` is computed once in `runAnalysis` after `state.windows` is built, and read by both `chapterLabelPlugin.afterDraw` and `buildChapterAnnotations`. Never recompute it inside `afterDraw` — that runs on every render frame.
 
 ---
 
@@ -220,7 +217,7 @@ Complete and test each phase before starting the next. Do not skip ahead.
 
 4. **Chapter regex edge cases:** Roman numerals are ambiguous (e.g. "I" matches too broadly). Anchor patterns to line starts: `/^(chapter|part|book)\s+/im`. Test with both "Chapter 1" and "CHAPTER ONE".
 
-5. **ROMAN regex can match empty string via backtracking (critical):** A ROMAN pattern with all-optional groups (`M{0,4}`, `C{0,3}`, `X{0,3}`, `I{0,3}`) can match an empty string. When the `(?=[MDCLXVI])` lookahead passes (e.g. for "muffled" because `m` is in the `i`-flag set), the engine consumes one char, then `\b` fails mid-word, and backtracks to a zero-length match. The `\b` then fires at the preceding space→word boundary, so the match succeeds as an empty string. Fix: add `(?!\w)` immediately after the number alternation group `(?:[0-9]+|${ROMAN}|${WRITTEN})`. This rejects the empty match when the next character is a word character.
+5. **ROMAN regex can match empty string via backtracking (critical):** A ROMAN pattern with all-optional groups (`M{0,4}`, `C{0,3}`, `X{0,3}`, `I{0,3}`) can match an empty string. When the `(?=[MDCLXVI])` lookahead passes (e.g. for "muffled" because `m` is in the `i`-flag set), the engine consumes one char, then `\b` fails mid-word, and backtracks to a zero-length match. The `\b` then fires at the preceding space→word boundary, so the match succeeds as an empty string. Fix: add `(?!\w)` immediately after the number alternation group `(?:[0-9]+|${ROMAN}|${WRITTEN})`. This rejects the empty match when the next character is a word character. **Do NOT add `\b` inside the ROMAN string itself** — the outer `(?!\w)` already covers this, and a redundant inner `\b` creates inconsistency.
 
 6. **Chapter deduplication threshold must be small:** The deduplication pass (removing matches within N chars of each other) guards against the same heading being caught by two patterns. Since all three patterns match different keywords, true duplicates are impossible — the threshold only needs to cover off-by-one positions. Use `> 5` chars, NOT `> 50`. A 50-char threshold silently drops a Chapter heading that appears within 50 chars of a Part heading (e.g. "PART II.\n_Subtitle._\n\nCHAPTER I." is only ~43 chars between the two).
 
@@ -233,6 +230,8 @@ Complete and test each phase before starting the next. Do not skip ahead.
 9. **Canvas rotation math for vertical text:** After `ctx.rotate(-Math.PI/2)`, the axes are remapped: `+x` in the rotated frame moves **upward** on the canvas, `+y` moves **left**. To draw text above `chartArea.top`, `ctx.translate(xPx, chartArea.top - 2)` then `ctx.fillText(label, positiveOffset, 0)` draws the label upward from that anchor. Using a negative x offset (or `textAlign: 'right'`) draws it downward into the chart area — a common mistake.
 
 10. **URL length limits:** Keep shareable URLs short. Encode word list as comma-separated plain text, not JSON. Do not attempt to encode book text in the URL.
+
+11. **`afterDraw` runs on every chart event — keep it O(chapters) not O(chapters×windows):** The `chapterLabelPlugin.afterDraw` hook fires on every tooltip hover, resize, and animation frame. Any inner loop over `state.windows` inside it is a hot-path O(n×m) scan. Always pre-compute chapter-to-window mappings (stored as `ch.windowIdx`) in `runAnalysis` once, after `state.windows` is populated, and just read the cached value in `afterDraw`.
 
 ---
 

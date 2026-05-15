@@ -1420,7 +1420,7 @@
       const WRITTEN = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve' +
         '|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty';
       // Roman numerals — lookahead ensures at least one numeral char; \b prevents matching into words
-      const ROMAN = '(?=[MDCLXVI])M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})\\b';
+      const ROMAN = '(?=[MDCLXVI])M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})';
       const pats = [
         new RegExp(`^chapter[\\t ]+(?:[0-9]+|${WRITTEN}|${ROMAN})(?!\\w)(?:[^\\n]{0,80})?`, 'gim'),
         new RegExp(`^(?:part|book)[\\t ]+(?:[0-9]+|${ROMAN}|${WRITTEN})(?!\\w)(?:[^\\n]{0,80})?`, 'gim'),
@@ -1490,6 +1490,16 @@
         pct => setAnalysisProgress(0.04 + pct * 0.96)
       );
 
+      // Cache window index per chapter once — avoids O(chapters×windows) on every chart frame
+      state.chapters.forEach(ch => {
+        let closest = 0, minDiff = Infinity;
+        state.windows.forEach((win, idx) => {
+          const d = Math.abs(win.offset - ch.wordOffset);
+          if (d < minDiff) { minDiff = d; closest = idx; }
+        });
+        ch.windowIdx = closest;
+      });
+
       hideAnalysisProgress();
       analyseBtn.disabled = false;
       renderChart();
@@ -1535,7 +1545,6 @@
       }
     } catch (_) {}
 
-    // Custom plugin: draws chapter labels above the chart area using canvas 2D API
     const chapterLabelPlugin = {
       id: 'chapterLabels',
       afterDraw(chart) {
@@ -1556,12 +1565,7 @@
         const MIN_GAP = 70; // min pixel gap before staggering kicks in
 
         state.chapters.forEach(ch => {
-          let closest = 0, minDiff = Infinity;
-          state.windows.forEach((win, idx) => {
-            const d = Math.abs(win.offset - ch.wordOffset);
-            if (d < minDiff) { minDiff = d; closest = idx; }
-          });
-          const xPx = xScale.getPixelForValue(closest);
+          const xPx = xScale.getPixelForValue(ch.windowIdx);
 
           stagger = (xPx - lastXPx) < MIN_GAP ? !stagger : false;
           lastXPx = xPx;
@@ -1604,15 +1608,10 @@
       if (!annotationAvailable || !state.chapters.length || !state.windows.length) return {};
       const annotations = {};
       state.chapters.forEach((ch, i) => {
-        let closest = 0, minDiff = Infinity;
-        state.windows.forEach((win, idx) => {
-          const d = Math.abs(win.offset - ch.wordOffset);
-          if (d < minDiff) { minDiff = d; closest = idx; }
-        });
         annotations[`ch${i}`] = {
           type: 'line',
-          xMin: closest,
-          xMax: closest,
+          xMin: ch.windowIdx,
+          xMax: ch.windowIdx,
           borderColor: 'rgba(255,255,255,0.18)',
           borderWidth: 1,
           borderDash: [4, 4],
