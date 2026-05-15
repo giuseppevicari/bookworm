@@ -13,7 +13,7 @@ Update this file when new decisions are made.
 **Tagline:** Narrative Frequency Visualizer
 **Deliverable:** A single self-contained `index.html` file. No build step. No backend. No external files. Runs in any modern browser by double-clicking.
 
-**What it does:** Users upload a book or document, enter one or more words to track (e.g. character names, plot elements), and the app plots a smooth frequency curve for each word across the timeline of the text. Chapter markers are overlaid on the chart for navigation. Additional views and tools help users explore co-occurrence and export results.
+**What it does:** Users upload a book or document, enter one or more words to track (e.g. character names, plot elements), and the app plots a smooth frequency curve for each word across the timeline of the text. Chapter markers are overlaid on the chart for navigation. A semantic network view and export tools are also available.
 
 **Primary use case:** Showcase application for vibe coding demos. Must be impressive, immediately usable, and require zero setup from the audience.
 
@@ -73,7 +73,7 @@ const state = {
   stepSize: 100,          // words per step (user-adjustable)
   exactMatch: true,       // true = \b word boundary; false = substring match
   chart: null,            // Chart.js instance
-  activeTab: 'frequency', // 'frequency' | 'heatmap'
+  activeTab: 'frequency', // 'frequency' | 'network'
   zoomLevel: 1,           // x-axis zoom factor (1 = full view)
   zoomOffset: 0,          // pan position as % (0–100); used when zoomLevel > 1
 };
@@ -139,16 +139,10 @@ Complete and test each phase before starting the next. Do not skip ahead.
 - Pressing Play resets to start if already at end
 
 ### Phase 6 — Relationship Heatmap Tab
-- Two tabs above the chart: "Frequency" and "Heatmap"
-- Heatmap tab renders a square matrix of all tracked word pairs
-- Cell color intensity = number of windows where both words appear together (co-occurrence count)
-- Use a single-hue gradient (e.g. dark navy → vivid accent color) for cell intensity
-- Show numeric co-occurrence count inside each cell if space allows
-- Axes labelled with word names; diagonal cells (word vs itself) shown in neutral gray
-- Heatmap re-renders automatically when words are added/removed
+~~Removed. The heatmap tab has been deleted from the app.~~
 
 ### Phase 7 — Export & Shareable URL
-- "Export PNG" button: uses `chart.toBase64Image()` to download the active view (frequency chart or heatmap canvas) as `bookworm-export.png`
+- "Export PNG" button: uses `chart.toBase64Image()` to download the frequency chart as `bookworm-export.png`
 - "Copy Link" button: encodes the current word list, window size, step size as URL query parameters (`?words=Darcy,Elizabeth&window=500&step=100`)
 - On page load: parse URL parameters and pre-populate word input and sliders if present
 - Show a toast notification ("Link copied!") on successful copy
@@ -166,7 +160,7 @@ Complete and test each phase before starting the next. Do not skip ahead.
 
 **Zoom and pan controls (BW-8):** A `#zoomControls` div lives inside `#frequencyView` immediately below `#chartWrapper`. It contains a Zoom slider (`#zoomSlider`, 1×–20×) and a Position pan slider (`#panRow` / `#panSlider`, 0–100%). `applyZoom()` sets `chart.options.scales.x.min/max` and calls `chart.update('none')`. The pan row is hidden (`display:none`) when zoom is 1×. `resetZoom()` restores both sliders to defaults and clears `min/max`. `renderChart()` calls `resetZoom()` on every new analysis so the view always starts full-width.
 
-**Semantic Network tab (BW-6):** A third tab `#tabNetwork` alongside Frequency and Heatmap. Renders a D3 v7 force-directed SVG graph in `#networkSvg`. The `buildCoOccurrences(term, contextRadius=10)` function scans all positions of `term` in the tokenized text and counts words within ±10 tokens, excluding stop words (constant `STOP_WORDS` Set) and the search term itself. Returns the top 20 by count. `renderNetwork(term, termCount, related)` builds the D3 simulation: central node (radius 22 px), related nodes sized by `networkNodeRadius()`, edge width by co-occurrence strength. Fixed-position tooltip appended to `<body>` on mouseenter, removed on re-render. Clicking a related node calls `generateNetwork(word)` to recenter. Export PNG shows a toast and does nothing on the Network tab (SVG-to-PNG export not supported).
+**Semantic Network tab (BW-6):** A second tab `#tabNetwork` alongside Frequency. Renders a D3 v7 force-directed SVG graph in `#networkSvg`. The `buildCoOccurrences(term, contextRadius=10)` function scans all positions of `term` in the tokenized text and counts words within ±10 tokens, excluding stop words (constant `STOP_WORDS` Set) and the search term itself. Returns the top 20 by count. `renderNetwork(term, termCount, related)` builds the D3 simulation: central node (radius 22 px), related nodes sized by `networkNodeRadius()`, edge width by co-occurrence strength. Fixed-position tooltip appended to `<body>` on mouseenter, removed on re-render. Clicking a related node calls `generateNetwork(word)` to recenter. Export PNG shows a toast and does nothing on the Network tab (SVG-to-PNG export not supported).
 
 ---
 
@@ -230,8 +224,6 @@ Complete and test each phase before starting the next. Do not skip ahead.
 
 7. **Word matching accuracy:** Use word-boundary regex (`\b`) for matching, not simple `includes()`. "art" should not match inside "eart" or "артефакт".
 
-6. **Heatmap canvas:** The heatmap is a custom `<canvas>` drawn with the 2D API, not a Chart.js chart. Keep it separate from the main chart instance.
-
 8. **Export on mobile:** `chart.toBase64Image()` may return a blank image if the canvas was not rendered with `devicePixelRatio` set correctly. Always set `devicePixelRatio: window.devicePixelRatio` in Chart.js options.
 
 9. **Canvas rotation math for vertical text:** After `ctx.rotate(-Math.PI/2)`, the axes are remapped: `+x` in the rotated frame moves **upward** on the canvas, `+y` moves **left**. To draw text above `chartArea.top`, `ctx.translate(xPx, chartArea.top - 2)` then `ctx.fillText(label, positiveOffset, 0)` draws the label upward from that anchor. Using a negative x offset (or `textAlign: 'right'`) draws it downward into the chart area — a common mistake.
@@ -283,7 +275,6 @@ Keep test files in the `test/` folder. They are not part of the deliverable.
 - [ ] Clicking a chart point opens the reading panel with correct excerpt
 - [ ] Tracked words are highlighted correctly in the excerpt
 - [ ] Animation plays, pauses, and resets correctly
-- [ ] Heatmap renders correct co-occurrence values
 - [ ] PNG export downloads a non-blank image
 - [ ] Shareable URL encodes and decodes word list correctly
 
