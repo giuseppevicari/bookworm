@@ -642,6 +642,12 @@
 
     .chapter-item:hover { border-color: var(--text-secondary); color: var(--text-primary); }
 
+    .chapter-item--active {
+      border-color: var(--accent) !important;
+      color: var(--accent) !important;
+      background: rgba(124, 106, 247, 0.12);
+    }
+
     /* ── Chart row (chart + reading panel side by side) ─────────── */
     @media (min-width: 1201px) {
       .chart-row {
@@ -1563,6 +1569,7 @@
       analyseBtn.disabled = false;
       renderChart();
       renderWordStats();
+      renderChapterPanel();
     }
 
     // Render per-word total count stats above the frequency chart
@@ -1698,10 +1705,18 @@
       notice.style.display = 'none';
       list.style.display   = 'flex';
       list.innerHTML = '';
-      state.chapters.forEach(ch => {
+      state.chapters.forEach((ch, i) => {
         const el = document.createElement('div');
         el.className   = 'chapter-item';
         el.textContent = ch.title;
+        if (ch.windowIdx !== undefined) {
+          el.style.cursor = 'pointer';
+          el.addEventListener('click', () => {
+            document.querySelectorAll('.chapter-item--active').forEach(e => e.classList.remove('chapter-item--active'));
+            el.classList.add('chapter-item--active');
+            zoomToChapter(i);
+          });
+        }
         list.appendChild(el);
       });
     }
@@ -1864,6 +1879,31 @@
       document.getElementById('zoomSlider').value = 1;
       document.getElementById('zoomVal').textContent = '1×';
       document.getElementById('panSlider').value = 0;
+      document.querySelectorAll('.chapter-item--active').forEach(el => el.classList.remove('chapter-item--active'));
+      applyZoom();
+    }
+
+    // Zoom chart to show only the window range for a given chapter index
+    function zoomToChapter(chapterIndex) {
+      if (!state.chart || !state.windows.length) return;
+
+      const total     = state.windows.length;
+      const chStart   = state.chapters[chapterIndex].windowIdx;
+      const chEnd     = chapterIndex + 1 < state.chapters.length
+        ? state.chapters[chapterIndex + 1].windowIdx - 1
+        : total - 1;
+
+      const desiredVisible = Math.max(2, chEnd - chStart + 1);
+      const maxStart       = Math.max(0, total - desiredVisible);
+
+      state.zoomLevel  = total / desiredVisible;
+      state.zoomOffset = maxStart > 0 ? (chStart / maxStart) * 100 : 0;
+
+      const displayZoom = Math.max(1, Math.min(20, Math.round(state.zoomLevel)));
+      document.getElementById('zoomSlider').value    = displayZoom;
+      document.getElementById('zoomVal').textContent = `${displayZoom}×`;
+      document.getElementById('panSlider').value     = Math.round(state.zoomOffset);
+
       applyZoom();
     }
 
