@@ -73,6 +73,8 @@ const state = {
   exactMatch: true,       // true = \b word boundary; false = substring match
   chart: null,            // Chart.js instance
   activeTab: 'frequency', // 'frequency' | 'heatmap'
+  zoomLevel: 1,           // x-axis zoom factor (1 = full view)
+  zoomOffset: 0,          // pan position as % (0–100); used when zoomLevel > 1
 };
 ```
 
@@ -160,6 +162,8 @@ Complete and test each phase before starting the next. Do not skip ahead.
 **Word stats bar:** A bar rendered above the frequency chart (below the animation toolbar) after analysis runs. Shows one pill per tracked word with: color swatch, word label, total count, and percentage of total words. Hidden until analysis completes. Element ID: `wordStatsBar`, CSS class: `word-stats-bar` / `word-stats-bar visible`.
 
 **Chapter labels on chart (canvas plugin):** Chapter labels are rendered above the chart area using a custom Chart.js `afterDraw` plugin (`chapterLabelPlugin`), NOT via chartjs-plugin-annotation labels. The plugin draws rotated text directly onto the canvas above `chartArea.top`. Chart options must include `layout.padding.top: 90` to reserve space for the labels. A toggle checkbox (`#chapterLabelsToggle`) sets `state.showChapterLabels` and calls `chart.update('none')`. See pitfall #9.
+
+**Zoom and pan controls (BW-8):** A `#zoomControls` div lives inside `#frequencyView` immediately below `#chartWrapper`. It contains a Zoom slider (`#zoomSlider`, 1×–20×) and a Position pan slider (`#panRow` / `#panSlider`, 0–100%). `applyZoom()` sets `chart.options.scales.x.min/max` and calls `chart.update('none')`. The pan row is hidden (`display:none`) when zoom is 1×. `resetZoom()` restores both sliders to defaults and clears `min/max`. `renderChart()` calls `resetZoom()` on every new analysis so the view always starts full-width.
 
 ---
 
