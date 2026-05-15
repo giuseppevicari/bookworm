@@ -14,6 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 
   <style>
     /* ── CSS Variables ───────────────────────────────────────────── */
@@ -1011,6 +1012,96 @@
       max-width: 100%;
     }
 
+    /* ── Semantic Network ───────────────────────────────────────── */
+    #networkView { display: none; }
+    #networkView.visible { display: block; }
+
+    .network-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+      align-items: center;
+    }
+
+    .network-input {
+      flex: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 150ms;
+    }
+
+    .network-input::placeholder { color: var(--text-secondary); }
+    .network-input:focus { border-color: var(--accent); }
+
+    .network-generate-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 9px 20px;
+      font-family: var(--font-body);
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 150ms;
+      white-space: nowrap;
+    }
+
+    .network-generate-btn:hover { background: var(--accent-hover); }
+
+    .network-empty {
+      height: 280px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      gap: 14px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+    }
+
+    .network-empty svg { opacity: 0.22; }
+
+    .network-message {
+      display: none;
+      padding: 14px 18px;
+      background: rgba(136,132,160,0.07);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 0.84rem;
+      text-align: center;
+    }
+
+    #networkSvg {
+      border-radius: 8px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .network-tooltip {
+      position: fixed;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      color: var(--text-primary);
+      pointer-events: none;
+      z-index: 200;
+      font-family: var(--font-body);
+      white-space: nowrap;
+    }
+
     /* ── Toast ───────────────────────────────────────────────────── */
     .toast {
       position: fixed;
@@ -1191,6 +1282,13 @@
                 </svg>
                 Heatmap
               </button>
+              <button class="tab-btn" id="tabNetwork">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+                  <line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/>
+                </svg>
+                Network
+              </button>
             </div>
             <div class="chart-toolbar">
               <button class="toolbar-btn" id="exportBtn" title="Export current view as PNG">
@@ -1271,6 +1369,30 @@
               <p>Add at least 2 words and run analysis to see co-occurrence</p>
             </div>
             <canvas id="heatmapCanvas" style="display:none"></canvas>
+          </div>
+
+          <!-- Semantic network view -->
+          <div id="networkView">
+            <div class="network-controls">
+              <input
+                type="text"
+                class="network-input"
+                id="networkSearchInput"
+                placeholder="Enter a word or phrase…"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button class="network-generate-btn" id="networkSearchBtn">Generate Network</button>
+            </div>
+            <div class="network-message" id="networkMessage"></div>
+            <div class="network-empty" id="networkEmpty">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                <circle cx="12" cy="5" r="2.5"/><circle cx="4" cy="19" r="2.5"/><circle cx="20" cy="19" r="2.5"/>
+                <line x1="12" y1="7.5" x2="4" y2="16.5"/><line x1="12" y1="7.5" x2="20" y2="16.5"/>
+              </svg>
+              <p>Enter a term and generate its semantic network</p>
+            </div>
+            <div id="networkSvg" style="display:none"></div>
           </div>
 
           <!-- Clickable word legend -->
@@ -2382,11 +2504,229 @@
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // SEMANTIC NETWORK  (BW-6)
+    // ─────────────────────────────────────────────────────────────────
+
+    const STOP_WORDS = new Set([
+      'the','a','an','and','or','but','in','on','at','to','for','of','with',
+      'by','from','as','is','was','are','were','be','been','being','have',
+      'has','had','do','does','did','will','would','could','should','may',
+      'might','shall','can','this','that','these','those','it','its',
+      'i','me','my','myself','we','our','ours','ourselves','you','your',
+      'yours','yourself','he','him','his','himself','she','her','hers',
+      'herself','they','them','their','theirs','themselves','what','which',
+      'who','whom','when','where','why','how','all','each','every','both',
+      'few','more','most','other','some','such','no','not','only','same',
+      'so','than','too','very','just','because','if','then','else','about',
+      'up','out','into','over','after','there','here','now','again',
+      'further','once','any','own','s','t','re','ve','ll','d','m','n',
+      'said','like','one','two','three','four','five','six','seven','eight',
+      'nine','ten','much','many','also','even','still','well','upon','also',
+      'went','come','came','know','think','say','go','get','make','see',
+      'look','time','little','great','good','old','man','men','woman','women',
+      'long','great','back','down','first','last','never','always','away',
+      'before','could','though','through','without','between','against',
+      'around','during','until','while','among','across','behind','beyond',
+      'however','therefore','whether','neither','either','nothing','something',
+      'anything','everything','everyone','someone','anyone','nowhere','somewhere',
+    ]);
+
+    // Build co-occurrence counts: words appearing within contextRadius tokens of the search term
+    function buildCoOccurrences(term, contextRadius = 10) {
+      const tokens  = tokenize(state.rawText);
+      const termNorm = term.toLowerCase().replace(/[^a-z0-9'\-]/g, '').trim();
+      if (!termNorm) return null;
+
+      const positions = [];
+      for (let i = 0; i < tokens.length; i++) {
+        const tok = tokens[i];
+        const hit  = state.exactMatch ? tok === termNorm : tok.includes(termNorm);
+        if (hit) positions.push(i);
+      }
+
+      if (positions.length === 0) return null;
+
+      const counts = {};
+      for (const pos of positions) {
+        const lo = Math.max(0, pos - contextRadius);
+        const hi = Math.min(tokens.length - 1, pos + contextRadius);
+        for (let j = lo; j <= hi; j++) {
+          if (j === pos) continue;
+          const w = tokens[j];
+          if (w === termNorm || w.length < 2 || STOP_WORDS.has(w)) continue;
+          counts[w] = (counts[w] || 0) + 1;
+        }
+      }
+
+      const related = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20)
+        .map(([word, count]) => ({ word, count }));
+
+      return { termCount: positions.length, related };
+    }
+
+    // Scale node radius by occurrence count relative to max
+    function networkNodeRadius(d, maxCount) {
+      if (d.isCenter) return 22;
+      return 7 + (d.count / maxCount) * 13;
+    }
+
+    // Render force-directed network SVG in #networkSvg
+    function renderNetwork(centralTerm, termCount, related) {
+      const container = document.getElementById('networkSvg');
+      container.innerHTML = '';
+      d3.selectAll('.network-tooltip').remove();
+
+      const W = container.offsetWidth || 700;
+      const H = 480;
+      const maxCount = related[0].count;
+
+      const nodes = [
+        { id: centralTerm, isCenter: true, count: termCount, x: W / 2, y: H / 2 },
+        ...related.map(r => ({ id: r.word, isCenter: false, count: r.count })),
+      ];
+
+      const links = related.map(r => ({
+        source: centralTerm,
+        target: r.word,
+        strength: r.count / maxCount,
+      }));
+
+      const svg = d3.select(container)
+        .append('svg')
+        .attr('viewBox', `0 0 ${W} ${H}`)
+        .attr('width', '100%')
+        .attr('height', H)
+        .style('border-radius', '8px')
+        .style('background', 'var(--bg-secondary)');
+
+      const tooltip = d3.select('body')
+        .append('div')
+        .attr('class', 'network-tooltip')
+        .style('display', 'none');
+
+      const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id)
+          .distance(d => 90 + (1 - d.strength) * 70))
+        .force('charge', d3.forceManyBody().strength(-260))
+        .force('center', d3.forceCenter(W / 2, H / 2))
+        .force('collision', d3.forceCollide(d => networkNodeRadius(d, maxCount) + 12));
+
+      const linkEl = svg.append('g')
+        .selectAll('line')
+        .data(links)
+        .join('line')
+        .attr('stroke', 'rgba(124,106,247,0.22)')
+        .attr('stroke-width', d => 1 + d.strength * 4);
+
+      const nodeG = svg.append('g')
+        .selectAll('g')
+        .data(nodes)
+        .join('g')
+        .style('cursor', d => d.isCenter ? 'default' : 'pointer')
+        .on('mouseenter', (event, d) => {
+          const label = d.isCenter
+            ? `"${d.id}" — ${d.count} occurrence${d.count !== 1 ? 's' : ''}`
+            : `"${d.id}" — co-occurs ${d.count} time${d.count !== 1 ? 's' : ''}`;
+          tooltip
+            .style('display', 'block')
+            .style('left', (event.clientX + 14) + 'px')
+            .style('top',  (event.clientY - 32) + 'px')
+            .text(label);
+        })
+        .on('mousemove', event => {
+          tooltip
+            .style('left', (event.clientX + 14) + 'px')
+            .style('top',  (event.clientY - 32) + 'px');
+        })
+        .on('mouseleave', () => tooltip.style('display', 'none'))
+        .on('click', (event, d) => {
+          if (!d.isCenter) generateNetwork(d.id);
+        });
+
+      nodeG.append('circle')
+        .attr('r', d => networkNodeRadius(d, maxCount))
+        .attr('fill', d => d.isCenter
+          ? '#7c6af7'
+          : lerpColor('#252535', '#5c4ed4', d.count / maxCount))
+        .attr('stroke', d => d.isCenter ? '#9d8fff' : 'rgba(124,106,247,0.4)')
+        .attr('stroke-width', d => d.isCenter ? 2.5 : 1.5);
+
+      nodeG.append('text')
+        .text(d => d.id)
+        .attr('text-anchor', 'middle')
+        .attr('dy', d => networkNodeRadius(d, maxCount) + 13)
+        .attr('fill', d => d.isCenter ? '#e8e6f0' : '#8884a0')
+        .style('font-size', d => d.isCenter ? '13px' : '11px')
+        .style('font-family', 'var(--font-body)')
+        .style('font-weight', d => d.isCenter ? '600' : '400')
+        .style('pointer-events', 'none');
+
+      simulation.on('tick', () => {
+        nodes.forEach(n => {
+          const r = networkNodeRadius(n, maxCount) + 6;
+          n.x = Math.max(r, Math.min(W - r, n.x));
+          n.y = Math.max(r, Math.min(H - r, n.y));
+        });
+        linkEl
+          .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+          .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+      });
+    }
+
+    // Run semantic network search; optionally override the input with term
+    function generateNetwork(term) {
+      const input   = document.getElementById('networkSearchInput');
+      const empty   = document.getElementById('networkEmpty');
+      const message = document.getElementById('networkMessage');
+      const svgCont = document.getElementById('networkSvg');
+
+      if (term) input.value = term;
+      const searchTerm = (term || input.value).trim();
+      if (!searchTerm) return;
+
+      if (!state.rawText) {
+        message.textContent = 'Please upload a text file first.';
+        message.style.display = 'block';
+        empty.style.display = 'none';
+        svgCont.style.display = 'none';
+        return;
+      }
+
+      const result = buildCoOccurrences(searchTerm);
+
+      if (!result) {
+        message.textContent = 'This term was not found in the text.';
+        message.style.display = 'block';
+        empty.style.display = 'none';
+        svgCont.style.display = 'none';
+        return;
+      }
+
+      if (result.related.length < 3) {
+        message.textContent = 'Not enough related terms found to generate a meaningful network.';
+        message.style.display = 'block';
+        empty.style.display = 'none';
+        svgCont.style.display = 'none';
+        return;
+      }
+
+      message.style.display = 'none';
+      empty.style.display = 'none';
+      svgCont.style.display = 'block';
+
+      renderNetwork(searchTerm, result.termCount, result.related);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // EXPORT & SHARE  (Phase 7)
     // ─────────────────────────────────────────────────────────────────
 
     // Download the active view (frequency chart or heatmap) as a PNG file
     function exportPng() {
+      if (state.activeTab === 'network') { showToast('Switch to Frequency or Heatmap to export'); return; }
       let dataUrl;
       if (state.activeTab === 'heatmap') {
         const canvas = document.getElementById('heatmapCanvas');
@@ -2470,13 +2810,16 @@
     // Tab switching
     document.getElementById('tabFrequency').addEventListener('click', () => switchTab('frequency'));
     document.getElementById('tabHeatmap').addEventListener('click', () => switchTab('heatmap'));
+    document.getElementById('tabNetwork').addEventListener('click', () => switchTab('network'));
 
     function switchTab(tab) {
       state.activeTab = tab;
       document.getElementById('tabFrequency').classList.toggle('active', tab === 'frequency');
       document.getElementById('tabHeatmap').classList.toggle('active', tab === 'heatmap');
+      document.getElementById('tabNetwork').classList.toggle('active', tab === 'network');
       document.getElementById('frequencyView').style.display = tab === 'frequency' ? '' : 'none';
       document.getElementById('heatmapView').classList.toggle('visible', tab === 'heatmap');
+      document.getElementById('networkView').classList.toggle('visible', tab === 'network');
       document.getElementById('chartLegend').style.display  = tab === 'frequency' ? '' : 'none';
       if (tab === 'heatmap') renderHeatmap();
     }
@@ -2506,6 +2849,12 @@
     // Export and share
     document.getElementById('exportBtn').addEventListener('click', exportPng);
     document.getElementById('shareBtn').addEventListener('click', copyShareLink);
+
+    // Network search
+    document.getElementById('networkSearchBtn').addEventListener('click', () => generateNetwork());
+    document.getElementById('networkSearchInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') generateNetwork();
+    });
 
     // Pre-populate from URL on load
     parseUrlParams();
