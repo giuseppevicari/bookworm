@@ -485,7 +485,7 @@
     /* ── Sliders ─────────────────────────────────────────────────── */
     .sliders-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 16px;
       margin-top: 18px;
       padding-top: 16px;
@@ -1272,13 +1272,6 @@
                   <span class="slider-val" id="windowVal">500</span>
                 </label>
                 <input type="range" id="windowSlider" min="100" max="2000" step="100" value="500">
-              </div>
-              <div class="slider-group">
-                <label>
-                  Step size
-                  <span class="slider-val" id="stepVal">100</span>
-                </label>
-                <input type="range" id="stepSlider" min="50" max="500" step="50" value="100">
               </div>
             </div>
           </div>
@@ -2079,9 +2072,7 @@
     const wordInput     = document.getElementById('wordInput');
     const analyseBtn    = document.getElementById('analyseBtn');
     const windowSlider  = document.getElementById('windowSlider');
-    const stepSlider    = document.getElementById('stepSlider');
     const windowVal     = document.getElementById('windowVal');
-    const stepVal       = document.getElementById('stepVal');
 
     // Show the upload progress bar with a label and fill (0–1)
     function showProgress(msg, pct) {
@@ -2236,17 +2227,6 @@
 
     // Re-run analysis when window size is committed (mouse/touch release)
     windowSlider.addEventListener('change', () => {
-      if (state.windows.length > 0) runAnalysis();
-    });
-
-    // Show live slider value while dragging
-    stepSlider.addEventListener('input', () => {
-      state.stepSize      = parseInt(stepSlider.value);
-      stepVal.textContent = stepSlider.value;
-    });
-
-    // Re-run analysis when step size is committed
-    stepSlider.addEventListener('change', () => {
       if (state.windows.length > 0) runAnalysis();
     });
 
@@ -2634,7 +2614,6 @@
       const params = new URLSearchParams({
         words:  state.words.map(w => w.word).join(','),
         window: state.windowSize,
-        step:   state.stepSize,
         exact:  state.exactMatch ? '1' : '0',
       });
       const url = `${location.origin}${location.pathname}?${params}`;
@@ -2664,21 +2643,13 @@
     // Parse URL query params on load and pre-populate word chips + sliders
     function parseUrlParams() {
       const p = new URLSearchParams(location.search);
-      const w = p.get('window'), s = p.get('step'), words = p.get('words'), exact = p.get('exact');
+      const w = p.get('window'), words = p.get('words'), exact = p.get('exact');
       if (w) {
         const v = parseInt(w);
         if (v >= 100 && v <= 2000) {
           state.windowSize = v;
           windowSlider.value = v;
           windowVal.textContent = v;
-        }
-      }
-      if (s) {
-        const v = parseInt(s);
-        if (v >= 50 && v <= 500) {
-          state.stepSize = v;
-          stepSlider.value = v;
-          stepVal.textContent = v;
         }
       }
       if (exact !== null) {
