@@ -99,8 +99,15 @@
       gap: 20px;
     }
 
-    .theme-toggle {
+    .header-actions {
       margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .theme-toggle {
       background: none;
       border: 1px solid var(--border);
       border-radius: 999px;
@@ -113,9 +120,97 @@
       align-items: center;
       gap: 7px;
       transition: border-color 150ms, color 150ms;
-      flex-shrink: 0;
     }
     .theme-toggle:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+
+    /* ── Tutorial modal ───────────────────────────────────────────── */
+    .tutorial-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.72);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 200ms;
+    }
+    .tutorial-overlay.visible { opacity: 1; pointer-events: auto; }
+
+    .tutorial-modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 36px 32px;
+      max-width: 540px; width: 100%;
+      position: relative;
+      transform: translateY(16px);
+      transition: transform 200ms;
+    }
+    .tutorial-overlay.visible .tutorial-modal { transform: translateY(0); }
+
+    .tutorial-close {
+      position: absolute; top: 14px; right: 14px;
+      background: none; border: none; cursor: pointer;
+      color: var(--text-secondary); font-size: 1.1rem;
+      padding: 4px 8px; border-radius: 6px;
+      transition: color 150ms, background 150ms;
+      line-height: 1;
+    }
+    .tutorial-close:hover { color: var(--text-primary); background: var(--border); }
+
+    .tutorial-modal h2 {
+      font-family: var(--font-heading);
+      font-size: 1.8rem; font-weight: 400;
+      margin-bottom: 6px;
+    }
+    .tutorial-modal h2 em { font-style: normal; color: var(--accent); }
+
+    .tutorial-subtitle {
+      font-size: 0.88rem; color: var(--text-secondary);
+      margin-bottom: 26px;
+    }
+
+    .tutorial-steps {
+      display: flex; flex-direction: column; gap: 10px;
+      margin-bottom: 26px;
+    }
+    .tutorial-step {
+      display: flex; gap: 14px; align-items: flex-start;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
+    }
+    .tutorial-step-num {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      font-size: 0.75rem; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .tutorial-step-text strong {
+      display: block; font-size: 0.88rem; margin-bottom: 2px;
+    }
+    .tutorial-step-text span { font-size: 0.81rem; color: var(--text-secondary); }
+
+    .tutorial-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .tutorial-btn-primary {
+      flex: 1; min-width: 140px;
+      background: var(--accent); color: #fff;
+      border: none; border-radius: 999px;
+      padding: 10px 20px; font-family: var(--font-body);
+      font-size: 0.88rem; font-weight: 500;
+      cursor: pointer; transition: background 150ms;
+    }
+    .tutorial-btn-primary:hover { background: var(--accent-hover); }
+
+    .tutorial-btn-secondary {
+      flex: 1; min-width: 140px;
+      background: none;
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 10px 20px; font-family: var(--font-body);
+      font-size: 0.88rem; color: var(--text-primary);
+      cursor: pointer; transition: border-color 150ms;
+    }
+    .tutorial-btn-secondary:hover { border-color: var(--text-secondary); }
 
     .site-header h1 {
       font-family: var(--font-heading);
@@ -1172,20 +1267,30 @@
     <header class="site-header">
       <h1>Book<em>worm</em></h1>
       <span class="site-tagline">Narrative Frequency Visualizer</span>
-      <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
-        <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-        <span id="themeLabel">Light</span>
-      </button>
+      <div class="header-actions">
+        <button class="theme-toggle" id="tutorialBtn" title="How it works">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          How it works
+        </button>
+        <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
+          <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <span id="themeLabel">Light</span>
+        </button>
+      </div>
     </header>
 
     <div class="main-grid">
@@ -1458,6 +1563,42 @@
   <div class="toast" id="toast">
     <span class="toast-dot"></span>
     <span id="toastText"></span>
+  </div>
+
+  <!-- ── Tutorial modal ─────────────────────────────────────────── -->
+  <div class="tutorial-overlay" id="tutorialOverlay" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+    <div class="tutorial-modal">
+      <button class="tutorial-close" id="tutorialClose" aria-label="Close tutorial">&#x2715;</button>
+      <h2 id="tutorialTitle">Welcome to Book<em>worm</em></h2>
+      <p class="tutorial-subtitle">Visualize how words move through a story. Here's how to get started:</p>
+      <div class="tutorial-steps">
+        <div class="tutorial-step">
+          <div class="tutorial-step-num">1</div>
+          <div class="tutorial-step-text">
+            <strong>Load a text</strong>
+            <span>Upload a .txt or .pdf file, or jump straight in with the built-in sample &mdash; Alice's Adventures in Wonderland.</span>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="tutorial-step-num">2</div>
+          <div class="tutorial-step-text">
+            <strong>Enter words to track</strong>
+            <span>Type character names, themes, or any words separated by commas. Each gets its own color curve.</span>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="tutorial-step-num">3</div>
+          <div class="tutorial-step-text">
+            <strong>Explore the chart</strong>
+            <span>See frequency across the story, click any point to read that passage, or explore word relationships in the Network tab.</span>
+          </div>
+        </div>
+      </div>
+      <div class="tutorial-actions">
+        <button class="tutorial-btn-primary" id="tutorialTrySample">Try Sample Text</button>
+        <button class="tutorial-btn-secondary" id="tutorialUploadOwn">Upload My Own</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -6166,6 +6307,40 @@ THE END
     // Pre-populate from URL on load
     parseUrlParams();
 
+    // ─────────────────────────────────────────────────────────────────
+    // TUTORIAL
+    // ─────────────────────────────────────────────────────────────────
+
+    function showTutorial() {
+      document.getElementById('tutorialOverlay').classList.add('visible');
+    }
+
+    function hideTutorial() {
+      document.getElementById('tutorialOverlay').classList.remove('visible');
+      localStorage.setItem('bw-tutorial-seen', '1');
+    }
+
+    document.getElementById('tutorialClose').addEventListener('click', hideTutorial);
+    document.getElementById('tutorialOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) hideTutorial();
+    });
+
+    document.getElementById('tutorialTrySample').addEventListener('click', () => {
+      hideTutorial();
+      loadSampleText();
+    });
+
+    document.getElementById('tutorialUploadOwn').addEventListener('click', () => {
+      hideTutorial();
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('tutorialBtn').addEventListener('click', showTutorial);
+
+    if (!localStorage.getItem('bw-tutorial-seen')) showTutorial();
+
   </script>
+
+
 </body>
 </html>
