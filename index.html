@@ -6180,13 +6180,60 @@ THE END
     // EXPORT & SHARE  (Phase 7)
     // ─────────────────────────────────────────────────────────────────
 
-    // Download the active view as a PNG file
+    // Download the active view as a PNG file, composited with a legend row
     function exportPng() {
       if (state.activeTab === 'network') { showToast('Switch to Frequency to export'); return; }
       if (!state.chart) { showToast('Run analysis first'); return; }
-      const dataUrl = state.chart.toBase64Image('image/png', 1.0);
+
+      const light     = document.documentElement.dataset.theme === 'light';
+      const bgColor   = light ? '#ffffff' : '#1c1c26';
+      const textColor = light ? '#1a1825' : '#e8e6f0';
+      const dpr       = window.devicePixelRatio || 1;
+
+      const chartCanvas = document.getElementById('mainChart');
+      const cw = chartCanvas.width;
+      const ch = chartCanvas.height;
+
+      const visibleWords = state.words.filter(w => w.visible);
+      const legendH = visibleWords.length > 0 ? Math.round(52 * dpr) : 0;
+
+      const out = document.createElement('canvas');
+      out.width  = cw;
+      out.height = ch + legendH;
+      const ctx = out.getContext('2d');
+
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.drawImage(chartCanvas, 0, 0);
+
+      if (visibleWords.length > 0) {
+        const fontSize = Math.round(13 * dpr);
+        const dotR     = Math.round(5 * dpr);
+        const dotGap   = Math.round(7 * dpr);
+        const pillGap  = Math.round(20 * dpr);
+
+        ctx.font = `${fontSize}px 'DM Sans', system-ui, sans-serif`;
+        ctx.textBaseline = 'middle';
+
+        const pillWidths = visibleWords.map(w => dotR * 2 + dotGap + ctx.measureText(w.word).width);
+        const totalW     = pillWidths.reduce((a, b) => a + b, 0) + pillGap * (visibleWords.length - 1);
+        let x = (cw - totalW) / 2;
+        const y = ch + legendH / 2;
+
+        visibleWords.forEach((w, i) => {
+          ctx.beginPath();
+          ctx.arc(x + dotR, y, dotR, 0, Math.PI * 2);
+          ctx.fillStyle = w.color;
+          ctx.fill();
+
+          ctx.fillStyle = textColor;
+          ctx.fillText(w.word, x + dotR * 2 + dotGap, y);
+          x += pillWidths[i] + pillGap;
+        });
+      }
+
       const a = document.createElement('a');
-      a.href     = dataUrl;
+      a.href     = out.toDataURL('image/png');
       a.download = 'bookworm-export.png';
       a.click();
       showToast('Saved as bookworm-export.png');
