@@ -5152,27 +5152,41 @@ THE END
         .filter(t => t.length > 0 && /[a-z]/.test(t));
     }
 
-    // Slide a window across tokens, counting tracked words; yields to keep UI responsive
+    // Slide a window across tokens, counting tracked words/phrases; yields to keep UI responsive
     async function computeWindows(tokens, words, windowSize, stepSize, exactMatch, onProgress) {
       const results  = [];
-      const wordList = words.map(w => w.word);
-      const wordSet  = new Set(wordList);
       const CHUNK    = 400;
       let wi = 0;
       const totalWindows = Math.max(1,
         Math.floor((tokens.length - windowSize) / stepSize) + 1);
 
+      // Pre-separate single tokens from multi-token phrases
+      const singles    = words.filter(w => !w.word.includes(' '));
+      const phrases    = words.filter(w => w.word.includes(' ')).map(w => ({ word: w.word, toks: tokenize(w.word) }));
+      const singleSet  = new Set(singles.map(w => w.word));
+      const singleList = singles.map(w => w.word);
+
       for (let start = 0; start + windowSize <= tokens.length; start += stepSize) {
         const counts = {};
-        wordList.forEach(w => { counts[w] = 0; });
+        words.forEach(w => { counts[w.word] = 0; });
 
         for (let j = start; j < start + windowSize; j++) {
           const tok = tokens[j];
+          // Single words
           if (exactMatch) {
-            if (wordSet.has(tok)) counts[tok]++;
+            if (singleSet.has(tok)) counts[tok]++;
           } else {
-            for (const w of wordList) {
-              if (tok.includes(w)) counts[w]++;
+            for (const w of singleList) { if (tok.includes(w)) counts[w]++; }
+          }
+          // Phrases: match consecutive token sequences
+          for (const ph of phrases) {
+            const pt = ph.toks;
+            if (j + pt.length <= start + windowSize && tok === pt[0]) {
+              let match = true;
+              for (let k = 1; k < pt.length; k++) {
+                if (tokens[j + k] !== pt[k]) { match = false; break; }
+              }
+              if (match) counts[ph.word]++;
             }
           }
         }
@@ -5245,15 +5259,29 @@ THE END
       const effectiveWindow = Math.min(state.windowSize, tokens.length);
       const effectiveStep   = Math.min(state.stepSize, effectiveWindow);
 
-      // Count total occurrences per word in the full token list
+      // Count total occurrences per word/phrase in the full token list
       const wordCounts = {};
       for (const w of state.words) wordCounts[w.word] = 0;
+      const cSingles = state.words.filter(w => !w.word.includes(' '));
+      const cPhrases = state.words.filter(w => w.word.includes(' ')).map(w => ({ word: w.word, toks: tokenize(w.word) }));
       if (state.exactMatch) {
-        const wSet = new Set(state.words.map(w => w.word));
+        const wSet = new Set(cSingles.map(w => w.word));
         for (const t of tokens) { if (wSet.has(t)) wordCounts[t]++; }
       } else {
         for (const t of tokens) {
-          for (const w of state.words) { if (t.includes(w.word)) wordCounts[w.word]++; }
+          for (const w of cSingles) { if (t.includes(w.word)) wordCounts[w.word]++; }
+        }
+      }
+      for (const ph of cPhrases) {
+        const pt = ph.toks;
+        for (let i = 0; i <= tokens.length - pt.length; i++) {
+          if (tokens[i] === pt[0]) {
+            let match = true;
+            for (let k = 1; k < pt.length; k++) {
+              if (tokens[i + k] !== pt[k]) { match = false; break; }
+            }
+            if (match) wordCounts[ph.word]++;
+          }
         }
       }
       state.wordCounts = wordCounts;
