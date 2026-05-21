@@ -119,7 +119,7 @@ Complete and test each phase before starting the next. Do not skip ahead.
 - If zero chapters detected: silently skip overlay, show notice "No chapters detected"
 - If chapters found: render vertical dashed annotation lines on chart using chartjs-plugin-annotation
 - Show chapter title as rotated label at top of each line
-- Display detected chapter list as a scrollable panel below the chart
+- Display detected chapter list as a scrollable "04 — Chapter Navigator" panel below the chart; clicking an item calls `zoomToChapter(i)` to zoom the chart to that section
 
 ### Phase 4 — Reading Mode Side Panel
 - Clicking any data point on the chart opens a side panel (slides in from right on desktop; overlays on mobile)
@@ -142,10 +142,9 @@ Complete and test each phase before starting the next. Do not skip ahead.
 ~~Removed. The heatmap tab has been deleted from the app.~~
 
 ### Phase 7 — Export & Shareable URL
-- "Export PNG" button: uses `chart.toBase64Image()` to download the frequency chart as `bookworm-export.png`
-- "Copy Link" button: encodes the current word list, window size, and exact-match flag as URL query parameters (`?words=Darcy,Elizabeth&window=500&exact=1`)
-- On page load: parse URL parameters and pre-populate word input and window slider if present
-- Show a toast notification ("Link copied!") on successful copy
+- "Export PNG" button: composites the chart canvas with a legend row (colored dot + word label per visible word) onto an offscreen canvas, then downloads as `bookworm-export.png`. The canvas background is filled with the active theme's card color via a `beforeDraw` plugin (`bgFill`) registered inline on the Chart instance.
+- ~~"Copy Link" button~~ — removed. The `copyShareLink` function and URL param encoding still exist in code but are not exposed in the UI.
+- On page load: parse URL parameters (`?words=Darcy,Elizabeth&window=500&exact=1`) and pre-populate word input and window slider if present
 - Shareable URL does not include book text — user must re-upload
 
 ### Post-Phase Additions
@@ -242,6 +241,8 @@ Accent and font variables are shared between themes and are not overridden in li
 
 10. **URL length limits:** Keep shareable URLs short. Encode word list as comma-separated plain text, not JSON. Do not attempt to encode book text in the URL.
 
+12. **Export PNG background defaults to black without a fill plugin:** `chart.toBase64Image()` composites the canvas onto a transparent PNG, which renders black. Always keep the `bgFill` `beforeDraw` plugin registered inline on the Chart instance so it fills the correct theme color before every draw. If `renderChart()` is rewritten, do not remove this plugin.
+
 11. **`afterDraw` runs on every chart event — keep it O(chapters) not O(chapters×windows):** The `chapterLabelPlugin.afterDraw` hook fires on every tooltip hover, resize, and animation frame. Any inner loop over `state.windows` inside it is a hot-path O(n×m) scan. Always pre-compute chapter-to-window mappings (stored as `ch.windowIdx`) in `runAnalysis` once, after `state.windows` is populated, and just read the cached value in `afterDraw`.
 
 ---
@@ -264,14 +265,11 @@ Keep test files in the `test/` folder. They are not part of the deliverable.
 
 ---
 
-## Tools Available in This Session
-- Playwright MCP: use after each phase to screenshot and verify rendering
-- GitHub MCP: use to commit after each passing phase
-- feature-dev Plugin: use to develop features
-- code-review Plugin: use to review code 
-- code-simplifier Plugin: use to simplify code
-- context7 Plugin
-- frontend-design Plugin: use to design frontend     
+## Tools Available
+- **Atlassian MCP** (`mcp__atlassian__*`): read/transition Jira issues in project `BW`
+- **GitHub MCP** (`mcp__github__*`): create PRs, read issues
+- **Playwright** (via `npx playwright` / temp node script): browser-based verification and screenshots
+- **`/verify` skill**: run the app and screenshot to confirm a change works before reporting done
 
 ---
 
@@ -287,8 +285,8 @@ Keep test files in the `test/` folder. They are not part of the deliverable.
 - [ ] Clicking a chart point opens the reading panel with correct excerpt
 - [ ] Tracked words are highlighted correctly in the excerpt
 - [ ] Animation plays, pauses, and resets correctly
-- [ ] PNG export downloads a non-blank image
-- [ ] Shareable URL encodes and decodes word list correctly
+- [ ] PNG export downloads with correct theme background and legend row below the chart
+- [ ] URL params (`?words=…&window=…`) pre-populate the UI on load
 
 ---
 
