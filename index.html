@@ -234,6 +234,36 @@
       font-weight: 400;
     }
 
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .header-author {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-author a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: color 150ms, border-color 150ms;
+    }
+
+    .header-author a:hover {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .header-author .sep {
+      opacity: 0.4;
+    }
+
     /* ── Card ────────────────────────────────────────────────────── */
     .card {
       background: var(--bg-card);
@@ -1265,8 +1295,17 @@
 
     <!-- ── Header ──────────────────────────────────────────────── -->
     <header class="site-header">
-      <h1>Book<em>worm</em></h1>
-      <span class="site-tagline">Narrative Frequency Visualizer</span>
+      <div class="header-left">
+        <h1>Book<em>worm</em></h1>
+        <span class="site-tagline">Narrative Frequency Visualizer</span>
+        <div class="header-author">
+          <span>By <a href="mailto:indirizzoemail@gmail.com">Giuseppe Vicari</a></span>
+          <span class="sep">·</span>
+          <a href="https://github.com/giuseppevicari/bookworm" target="_blank" rel="noopener">GitHub</a>
+          <span class="sep">·</span>
+          <a href="https://www.linkedin.com/in/giuseppevicari/" target="_blank" rel="noopener">LinkedIn</a>
+        </div>
+      </div>
       <div class="header-actions">
         <button class="theme-toggle" id="tutorialBtn" title="How it works">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
