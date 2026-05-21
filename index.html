@@ -5050,14 +5050,17 @@ THE END
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Read a plain-text file and resolve with its string content
-    function parseTxt(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = e => resolve(e.target.result);
-        reader.onerror = () => reject(new Error('Could not read file'));
-        reader.readAsText(file, 'UTF-8');
-      });
+    // Read a plain-text file, auto-detecting encoding (UTF-8 then Windows-1252 fallback)
+    async function parseTxt(file) {
+      const buffer = await file.arrayBuffer();
+      const bytes  = new Uint8Array(buffer);
+      try {
+        // Strict UTF-8 — throws if the file contains invalid byte sequences
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      } catch {
+        // Fall back to Windows-1252 (covers Latin-1 and most Western-European .txt files)
+        return new TextDecoder('windows-1252').decode(bytes);
+      }
     }
 
     // Extract text from every page of a PDF, calling onProgress(0–1) each page
