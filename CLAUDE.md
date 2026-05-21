@@ -70,7 +70,7 @@ const state = {
   wordCharMap: [],        // char offsets of every whitespace-delimited word (for excerpt lookup)
   showChapterLabels: true,// toggle for chapter label visibility on chart
   windowSize: 500,        // words per window (user-adjustable)
-  stepSize: 100,          // words per step (user-adjustable)
+  stepSize: 100,          // words per step (fixed — slider removed in BW-14)
   exactMatch: true,       // true = \b word boundary; false = substring match
   chart: null,            // Chart.js instance
   activeTab: 'frequency', // 'frequency' | 'network'
@@ -104,7 +104,7 @@ Complete and test each phase before starting the next. Do not skip ahead.
 - Render Chart.js line chart: x-axis = window index, y-axis = frequency count
 - Each word = one dataset with its assigned color
 - Smooth curves (tension: 0.4)
-- Add window size and step size sliders; re-run analysis on change without re-parsing text
+- Add a window size slider; re-run analysis on change without re-parsing text (step size is fixed at 100 — no slider)
 - Words can be added/removed/toggled without re-parsing text
 
 ### Phase 3 — Chapter Detection & Overlay
@@ -143,8 +143,8 @@ Complete and test each phase before starting the next. Do not skip ahead.
 
 ### Phase 7 — Export & Shareable URL
 - "Export PNG" button: uses `chart.toBase64Image()` to download the frequency chart as `bookworm-export.png`
-- "Copy Link" button: encodes the current word list, window size, step size as URL query parameters (`?words=Darcy,Elizabeth&window=500&step=100`)
-- On page load: parse URL parameters and pre-populate word input and sliders if present
+- "Copy Link" button: encodes the current word list, window size, and exact-match flag as URL query parameters (`?words=Darcy,Elizabeth&window=500&exact=1`)
+- On page load: parse URL parameters and pre-populate word input and window slider if present
 - Show a toast notification ("Link copied!") on successful copy
 - Shareable URL does not include book text — user must re-upload
 
@@ -160,15 +160,22 @@ Complete and test each phase before starting the next. Do not skip ahead.
 
 **Zoom and pan controls (BW-8):** A `#zoomControls` div lives inside `#frequencyView` immediately below `#chartWrapper`. It contains a Zoom slider (`#zoomSlider`, 1×–20×) and a Position pan slider (`#panRow` / `#panSlider`, 0–100%). `applyZoom()` sets `chart.options.scales.x.min/max` and calls `chart.update('none')`. The pan row is hidden (`display:none`) when zoom is 1×. `resetZoom()` restores both sliders to defaults and clears `min/max`. `renderChart()` calls `resetZoom()` on every new analysis so the view always starts full-width.
 
-**Semantic Network tab (BW-6):** A second tab `#tabNetwork` alongside Frequency. Renders a D3 v7 force-directed SVG graph in `#networkSvg`. The `buildCoOccurrences(term, contextRadius=10)` function scans all positions of `term` in the tokenized text and counts words within ±10 tokens, excluding stop words (constant `STOP_WORDS` Set) and the search term itself. Returns the top 20 by count. `renderNetwork(term, termCount, related)` builds the D3 simulation: central node (radius 22 px), related nodes sized by `networkNodeRadius()`, edge width by co-occurrence strength. Fixed-position tooltip appended to `<body>` on mouseenter, removed on re-render. Clicking a related node calls `generateNetwork(word)` to recenter. Export PNG shows a toast and does nothing on the Network tab (SVG-to-PNG export not supported).
+**Semantic Network tab (BW-6):** A second tab `#tabNetwork` alongside Frequency. Renders a D3 v7 force-directed SVG graph in `#networkSvg`. The `buildCoOccurrences(term, contextRadius=10)` function scans all positions of `term` in the tokenized text and counts words within ±10 tokens, excluding stop words (constant `STOP_WORDS` Set) and the search term itself. Returns the top 20 by count. `renderNetwork(term, termCount, related)` builds the D3 simulation: central node (radius 22 px), related nodes sized by `networkNodeRadius()`, edge width by co-occurrence strength. Fixed-position tooltip appended to `<body>` on mouseenter, removed on re-render. Clicking a related node calls `generateNetwork(word)` to recenter. Export PNG shows a toast and does nothing on the Network tab (SVG-to-PNG export not supported). The search input placeholder is "Enter a word…" — phrase search is not supported (BW-12). Node labels use `style('fill', ...)` with CSS variables (`var(--text-primary)` / `var(--text-secondary)`) so they adapt to the active theme.
+
+**Light/dark mode toggle (BW-13):** A pill button in the header (`#themeToggle`) switches between dark (default) and light mode. Theme is applied by setting `data-theme="light"` on `<html>`; dark mode has no attribute. Light mode variables are declared under `[data-theme="light"]` in the CSS. Preference is persisted in `localStorage` under key `bw-theme`. `applyTheme(theme)` sets the attribute, updates the button icon/label, and calls `renderChart()` if a chart exists. Chart colours (grid lines, tick labels, tooltip) are resolved at render time by `getThemeColors()`, which reads `document.documentElement.dataset.theme`. The `chapterLabelPlugin.afterDraw` also reads the theme to pick label colour. Light mode variables:
+```css
+--bg-primary: #f5f4f8; --bg-secondary: #eeecf6; --bg-card: #ffffff;
+--border: #d4d0ea; --text-primary: #1a1825; --text-secondary: #6b6785;
+--success: #16a34a; --danger: #dc2626;
+```
 
 ---
 
 ## Design System
 
-**Theme:** Dark. Not generic dark — refined, editorial dark. Think data journalism meets literary analysis.
+**Theme:** Dark by default (refined, editorial dark — data journalism meets literary analysis), with a user-toggleable light mode. See the Light/dark mode toggle entry in Post-Phase Additions for full details.
 
-**Colors (CSS variables):**
+**Dark mode colors (CSS variables on `:root`):**
 ```css
 --bg-primary: #0e0e12;
 --bg-secondary: #16161d;
@@ -181,6 +188,8 @@ Complete and test each phase before starting the next. Do not skip ahead.
 --success: #4ade80;
 --danger: #f87171;
 ```
+
+Accent and font variables are shared between themes and are not overridden in light mode.
 
 **Word colors** (assign in this order, cycling if more than 8 words):
 ```
@@ -201,10 +210,9 @@ Complete and test each phase before starting the next. Do not skip ahead.
 
 **Chart style:**
 - Background: `var(--bg-card)`
-- Grid lines: `rgba(255,255,255,0.05)`
-- Axis labels: `var(--text-secondary)`
-- Tooltip: dark card with colored word label and frequency value
-- Chapter annotation lines: dashed, `rgba(255,255,255,0.25)`, label in `var(--text-secondary)`
+- Grid lines, tick colours, and tooltip colours are resolved at render time by `getThemeColors()` — never hardcode these values
+- Tooltip: card styled to match the active theme, with colored word label and frequency value
+- Chapter annotation lines: dashed, `rgba(255,255,255,0.25)`, label colour picked in `chapterLabelPlugin.afterDraw` based on theme
 
 ---
 
@@ -270,7 +278,7 @@ Keep test files in the `test/` folder. They are not part of the deliverable.
 - [ ] Word input accepts comma-separated words, assigns colors correctly
 - [ ] Frequency chart renders with correct curves
 - [ ] Adding/removing words updates chart without re-parsing
-- [ ] Window and step sliders recalculate analysis correctly
+- [ ] Window size slider recalculates analysis correctly
 - [ ] Chapter markers appear at correct positions
 - [ ] Clicking a chart point opens the reading panel with correct excerpt
 - [ ] Tracked words are highlighted correctly in the excerpt
