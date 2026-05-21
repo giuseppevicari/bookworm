@@ -1,2 +1,136 @@
-# bookworm
-A browser-based narrative analysis tool that visualises how characters, themes, and plot elements rise and fall across the timeline of any book or document.
+# Bookworm — Narrative Frequency Visualizer
+
+Track how characters, themes, and plot elements rise and fall across the timeline of any book or document — no account, no install, no server.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+---
+
+## What it does
+
+Upload a `.txt` or `.pdf` file, type one or more words to track (e.g. character names, recurring motifs), and Bookworm plots a smooth frequency curve for each word across the full timeline of the text. Chapter markers are detected automatically and overlaid on the chart for navigation.
+
+**Live demo:** [bookworm.vercel.app](https://bookworm.vercel.app) *(or open `index.html` directly in any modern browser)*
+
+---
+
+## Features
+
+- **Frequency chart** — sliding-window analysis with adjustable window size; smooth curves per tracked word
+- **Chapter detection** — automatically finds `Chapter`, `Part`, `Book`, `Prologue`, `Epilogue`, and more; overlays dashed markers on the chart
+- **Chapter Navigator** — scrollable panel listing all detected chapters; click any entry to zoom the chart to that section
+- **Reading panel** — click any data point to read the raw excerpt at that position, with tracked words highlighted in their chart colours
+- **Semantic network** — force-directed graph showing co-occurrence relationships for any word in the text
+- **Animation** — replay the story by progressively revealing the chart; adjustable speed
+- **Zoom and pan** — zoom up to 20× on any region of the chart
+- **Export PNG** — download a composite image of the chart with a labelled legend
+- **Light / dark theme** — toggleable, persisted in `localStorage`
+- **Sample text** — Alice's Adventures in Wonderland is built in; no upload needed to try the app
+- **Shareable URL** — word list and window size are encoded in the URL for easy sharing
+
+---
+
+## Usage
+
+### Option 1 — Open locally
+
+```
+git clone https://github.com/giuseppevicari/bookworm.git
+cd bookworm
+open index.html          # macOS
+start index.html         # Windows
+xdg-open index.html      # Linux
+```
+
+No build step. No dependencies to install. It runs entirely in the browser.
+
+### Option 2 — Try the sample
+
+Open the app and click **"or try with sample text"** beneath the upload zone to load Alice's Adventures in Wonderland instantly.
+
+### Tracking words
+
+1. Upload a `.txt` or `.pdf` file (or use the sample text).
+2. Type a word in the **Track Words** box and press Enter or comma. Add up to 8 words.
+3. Click **Analyse**.
+4. Use the **Window Size** slider to adjust smoothing (larger = smoother, smaller = more detail).
+
+---
+
+## Configuration
+
+| URL parameter | Type | Description |
+|---|---|---|
+| `words` | `string` | Comma-separated list of words to pre-load, e.g. `?words=Alice,rabbit` |
+| `window` | `number` | Window size in words, e.g. `?window=300` |
+| `exact` | `0` or `1` | `1` = word-boundary match (default); `0` = substring match |
+
+Example: `index.html?words=Alice,Queen&window=400&exact=1`
+
+---
+
+## Requirements
+
+- Any modern browser (Chrome, Firefox, Safari, Edge — released 2020 or later)
+- No internet connection required once the page has loaded (all CDN assets are loaded on first visit)
+- PDF text extraction requires a text-based PDF; scanned image PDFs are not supported
+
+---
+
+## Deployment
+
+The app is a single `index.html` file with no build step. Deploy anywhere that serves static files.
+
+**Vercel (recommended):**
+
+```
+vercel deploy
+```
+
+The included `vercel.json` configures the project as a static site with no framework detection.
+
+**Any static host** (GitHub Pages, Netlify, Cloudflare Pages): upload or point the host at the repository root.
+
+---
+
+## Troubleshooting
+
+**PDF shows no text / empty analysis**
+The PDF is likely a scanned image. Bookworm uses PDF.js text extraction, which requires a text layer. Try a different PDF or paste the text into a `.txt` file.
+
+**No chapters detected**
+Chapter detection looks for headings at the start of a line (`Chapter 1`, `CHAPTER ONE`, `Part II`, `Prologue`, etc.). Plain prose without structural headings will not produce markers — this is expected.
+
+**Chart looks flat for a rare word**
+Try reducing the window size so each window covers fewer words. The default (500 words) smooths over short bursts of usage.
+
+**Export PNG is black**
+This can happen if the browser blocks canvas operations on a `file://` URL in strict security mode. Use a local server (`npx serve .`) or deploy to a host.
+
+---
+
+## Contributing
+
+1. Fork the repository and create a branch from `main`.
+2. The entire application lives in `index.html` — no build tooling required.
+3. Keep functions small and single-purpose. Follow the code structure documented in `CLAUDE.md`.
+4. Open a pull request. An automated Claude code review will run on every PR.
+
+Please open an issue before starting work on a large change so we can discuss the approach first.
+
+---
+
+## Reporting issues
+
+Open an issue at [github.com/giuseppevicari/bookworm/issues](https://github.com/giuseppevicari/bookworm/issues). Include:
+
+- Browser and OS
+- File type (`.txt` / `.pdf`) and approximate word count
+- Steps to reproduce
+- What you expected vs. what happened
+
+---
+
+## License
+
+[MIT](LICENSE) © 2026 giuseppevicari
