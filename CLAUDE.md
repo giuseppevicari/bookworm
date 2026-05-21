@@ -64,9 +64,9 @@ Maintain a single `state` object. Never use scattered global variables. Shape:
 const state = {
   rawText: '',            // full extracted text string
   words: [],              // array of { word, color, visible }
-  windows: [],            // array of { offset, counts: { word: n } }
+  windows: [],            // array of { offset, counts: { normForMatch(word): n } }
   chapters: [],           // array of { title, wordOffset, windowIdx }
-  wordCounts: {},         // total occurrence count per word in full text
+  wordCounts: {},         // total occurrence count per word; keyed by normForMatch(w.word)
   wordCharMap: [],        // char offsets of every whitespace-delimited word (for excerpt lookup)
   showChapterLabels: true,// toggle for chapter label visibility on chart
   windowSize: 500,        // words per window (user-adjustable)
@@ -91,7 +91,7 @@ Complete and test each phase before starting the next. Do not skip ahead.
 - Dark-themed layout with header, upload zone, word input, and chart placeholder
 - Drag-and-drop + click-to-browse file upload
 - Accept `.txt` and `.pdf` only
-- Extract full text from .txt via FileReader
+- Extract full text from .txt via `parseTxt()`: read as `ArrayBuffer`, attempt strict UTF-8 decode (`TextDecoder('utf-8', { fatal: true })`), fall back to `windows-1252` if that throws — covers the vast majority of real-world `.txt` files
 - Extract full text from .pdf via PDF.js (handle async page-by-page extraction)
 - Show loading spinner/progress bar during extraction
 - Store extracted text in `state.rawText`
@@ -164,6 +164,10 @@ Complete and test each phase before starting the next. Do not skip ahead.
 **Sample text (BW-17):** Alice's Adventures in Wonderland is embedded as a JS template literal constant `SAMPLE_TEXT` (with metadata in `SAMPLE_TEXT_META`). A "or try with sample text" link (`#sampleTextBtn` / `.link-btn`) sits below the upload zone badges inside the upload card, inside `#sampleTextRow`. Clicking it calls `loadSampleText()`, which populates `state.rawText`, runs `detectChapters` and `buildWordCharMap`, then calls `showFileInfo("Sample Text: Alice's Adventures in Wonderland", wordCount)`. `showFileInfo` hides `#sampleTextRow`; the "Change" button handler restores it. If `SAMPLE_TEXT` is empty, a friendly error is shown. The sample text flows through the same analysis pipeline as uploaded files.
 
 **In-app tutorial (BW-15):** A welcome modal (`#tutorialOverlay` / `.tutorial-overlay`) appears on first visit, gated by `localStorage` key `bw-tutorial-seen`. Shows 3 numbered step cards: Load a text → Enter words → Explore the chart. Two CTAs: "Try Sample Text" (`#tutorialTrySample`) calls `loadSampleText()` then hides the modal; "Upload My Own" (`#tutorialUploadOwn`) programmatically clicks `#fileInput` then hides the modal. Close button (`#tutorialClose`) and clicking the backdrop also dismiss it. A "How it works" pill button (`#tutorialBtn`) in `.header-actions` (alongside `#themeToggle`) re-opens the modal at any time. Both header buttons are wrapped in `.header-actions` (flex row, `margin-left: auto`) — the old `margin-left: auto` that was on `.theme-toggle` has been moved to `.header-actions`.
+
+**Multi-word phrase search (BW-25):** The frequency analyser supports phrases like "white rabbit" or "red queen" in addition to single words. In `computeWindows` and `runAnalysis`, words are pre-split into `singles` (no space) and `phrases` (contains space). Singles use Set lookup; phrases are pre-tokenized once via `tokenize(w.word)` and matched by scanning consecutive token sequences. All counts maps are keyed by `normForMatch(w.word)` so accented and plain spellings resolve to the same bucket. The Network tab search input does not support phrases (single word only).
+
+**`normForMatch()` helper and Unicode normalization pipeline:** A `normForMatch(s)` function in the ANALYSER section strips combining diacritical marks (U+0300–U+036F) and lowercases, producing a canonical ASCII-safe key for all comparison and counting operations. It is used in: `tokenize()` (to normalize text tokens before storing), all counts map keys (`computeWindows`, `runAnalysis`, chart datasets, `renderChips`, `renderWordStats`), and `highlightExcerpt()` (to match accented text with accented or plain search terms). The original `w.word` string is **never modified** — it is preserved for display only. This separation (normalize at comparison time, preserve at display time) is the correct pattern for accent-insensitive search.
 
 **Light/dark mode toggle (BW-13):** A pill button in the header (`#themeToggle`) switches between dark (default) and light mode. Theme is applied by setting `data-theme="light"` on `<html>`; dark mode has no attribute. Light mode variables are declared under `[data-theme="light"]` in the CSS. Preference is persisted in `localStorage` under key `bw-theme`. `applyTheme(theme)` sets the attribute, updates the button icon/label, and calls `renderChart()` if a chart exists. Chart colours (grid lines, tick labels, tooltip) are resolved at render time by `getThemeColors()`, which reads `document.documentElement.dataset.theme`. The `chapterLabelPlugin.afterDraw` also reads the theme to pick label colour. Light mode variables:
 ```css
@@ -245,6 +249,14 @@ Accent and font variables are shared between themes and are not overridden in li
 
 11. **`afterDraw` runs on every chart event — keep it O(chapters) not O(chapters×windows):** The `chapterLabelPlugin.afterDraw` hook fires on every tooltip hover, resize, and animation frame. Any inner loop over `state.windows` inside it is a hot-path O(n×m) scan. Always pre-compute chapter-to-window mappings (stored as `ch.windowIdx`) in `runAnalysis` once, after `state.windows` is populated, and just read the cached value in `afterDraw`.
 
+13. **Text file encoding — never use `FileReader.readAsText`:** Many real-world `.txt` files (especially Windows-created ones) are encoded in Windows-1252, not UTF-8. `FileReader.readAsText(file, 'UTF-8')` silently garbles non-ASCII bytes (e.g. `û` U+00FB → replacement chars or wrong glyphs) rather than throwing an error, making the bug invisible. Always read as `ArrayBuffer`, then attempt `new TextDecoder('utf-8', { fatal: true }).decode(bytes)`, and fall back to `new TextDecoder('windows-1252').decode(bytes)` if that throws. This covers UTF-8, UTF-8 BOM, and Windows-1252 without user intervention.
+
+14. **Unicode normalization form mismatches in JS object key lookups:** JavaScript strings that look identical visually may be stored in different Unicode normalization forms (NFC vs NFD) depending on the input source (keyboard, clipboard, file). Using `w.word` directly as a JS object key causes silent lookup failures: `win.counts[w.word]` returns `undefined`, and `undefined || 0` silently reports zero matches. Fix: always normalize to a canonical form with `normForMatch(w.word)` before using as a key. Use this canonical key everywhere counts are written or read; use `w.word` only for display.
+
+15. **Diacritics in search terms strip silently if normalized too early:** If you call `normalize('NFD').replace(/combining/g, '')` inside `addWord()`, the chip label permanently loses its accent (e.g. "Nazgûl" becomes "Nazgul"). Normalization must happen at comparison time, not at storage time. Store `w.word` as typed; apply `normForMatch()` only when building regex patterns, count keys, or token comparisons. For `highlightExcerpt()`, NFD-normalize the excerpt text and build the regex with `[\\u0300-\\u036f]*` interleaved between each letter so accented characters in the source text are matched by plain search terms and vice versa.
+
+16. **Multi-word phrase search requires consecutive token sequence matching:** Phrases cannot be matched by a single Set lookup against tokenized text. Detect phrases by `w.word.includes(' ')`, pre-tokenize them once with `tokenize(w.word)`, then scan the token array for consecutive matches. Handle the window boundary check (`j + pt.length <= start + windowSize`) to avoid counting phrases that span across window edges. Single words and phrases must be processed separately in both `computeWindows` and `runAnalysis`.
+
 ---
 
 ## File Structure
@@ -258,7 +270,9 @@ bookworm/
 │       ├── claude.yml                  ← Claude PR Assistant
 │       └── claude-code-review.yml      ← Claude Code Review on PRs
 └── test/
-    └── alice.txt      ← Alice's Adventures in Wonderland (from Project Gutenberg)
+    ├── alice.txt            ← Alice's Adventures in Wonderland (from Project Gutenberg)
+    ├── nazgul_test.txt      ← UTF-8 test file with mixed Nazgûl/nazgul spellings
+    └── nazgul_latin1.txt    ← Windows-1252 encoded test file with "Nazgûl" (byte 0xFB)
 ```
 
 Keep test files in the `test/` folder. They are not part of the deliverable.
