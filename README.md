@@ -1,8 +1,7 @@
 # Bookworm — Narrative Frequency Visualizer
 
-Track how characters, themes, and plot elements rise and fall across the timeline of any book or document — no account, no install, no server.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+Track how characters, themes, and plot elements rise and fall across the timeline of any book or document.
+Created as a vibe coding experiment and learning experience.
 
 ---
 
@@ -10,7 +9,6 @@ Track how characters, themes, and plot elements rise and fall across the timelin
 
 Upload a `.txt` or `.pdf` file, type one or more words to track (e.g. character names, recurring motifs), and Bookworm plots a smooth frequency curve for each word across the full timeline of the text. Chapter markers are detected automatically and overlaid on the chart for navigation.
 
-**Live demo:** [bookworm.vercel.app](https://bookworm.vercel.app) *(or open `index.html` directly in any modern browser)*
 
 ---
 
@@ -21,12 +19,10 @@ Upload a `.txt` or `.pdf` file, type one or more words to track (e.g. character 
 - **Chapter Navigator** — scrollable panel listing all detected chapters; click any entry to zoom the chart to that section
 - **Reading panel** — click any data point to read the raw excerpt at that position, with tracked words highlighted in their chart colours
 - **Semantic network** — force-directed graph showing co-occurrence relationships for any word in the text
-- **Animation** — replay the story by progressively revealing the chart; adjustable speed
-- **Zoom and pan** — zoom up to 20× on any region of the chart
-- **Export PNG** — download a composite image of the chart with a labelled legend
-- **Light / dark theme** — toggleable, persisted in `localStorage`
+- **Zoom and pan** — zoom up on any region of the chart
+- **Export PNG** — download an image of the chart with a labelled legend
+- **Light / dark theme** — toggleable
 - **Sample text** — Alice's Adventures in Wonderland is built in; no upload needed to try the app
-- **Shareable URL** — word list and window size are encoded in the URL for easy sharing
 
 ---
 
@@ -42,7 +38,7 @@ start index.html         # Windows
 xdg-open index.html      # Linux
 ```
 
-No build step. No dependencies to install. It runs entirely in the browser.
+It runs entirely in the browser.
 
 ### Option 2 — Try the sample
 
@@ -57,17 +53,6 @@ Open the app and click **"or try with sample text"** beneath the upload zone to 
 
 ---
 
-## Configuration
-
-| URL parameter | Type | Description |
-|---|---|---|
-| `words` | `string` | Comma-separated list of words to pre-load, e.g. `?words=Alice,rabbit` |
-| `window` | `number` | Window size in words, e.g. `?window=300` |
-| `exact` | `0` or `1` | `1` = word-boundary match (default); `0` = substring match |
-
-Example: `index.html?words=Alice,Queen&window=400&exact=1`
-
----
 
 ## Requirements
 
@@ -78,10 +63,6 @@ Example: `index.html?words=Alice,Queen&window=400&exact=1`
 ---
 
 ## Deployment
-
-The app is a single `index.html` file with no build step. Deploy anywhere that serves static files.
-
-**Vercel (recommended):**
 
 ```
 vercel deploy
@@ -107,16 +88,6 @@ Try reducing the window size so each window covers fewer words. The default (500
 **Export PNG is black**
 This can happen if the browser blocks canvas operations on a `file://` URL in strict security mode. Use a local server (`npx serve .`) or deploy to a host.
 
----
-
-## Contributing
-
-1. Fork the repository and create a branch from `main`.
-2. The entire application lives in `index.html` — no build tooling required.
-3. Keep functions small and single-purpose. Follow the code structure documented in `CLAUDE.md`.
-4. Open a pull request. An automated Claude code review will run on every PR.
-
-Please open an issue before starting work on a large change so we can discuss the approach first.
 
 ---
 
