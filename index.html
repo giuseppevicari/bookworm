@@ -5461,6 +5461,17 @@ THE END
           labels:   buildLabels(),
           datasets: buildDatasets(),
         },
+        plugins: [{
+          id: 'bgFill',
+          beforeDraw(chart) {
+            const ctx = chart.canvas.getContext('2d');
+            const light = document.documentElement.dataset.theme === 'light';
+            ctx.save();
+            ctx.fillStyle = light ? '#ffffff' : '#1c1c26';
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
+          }
+        }],
         options: {
           devicePixelRatio:    window.devicePixelRatio || 1,
           responsive:          true,
