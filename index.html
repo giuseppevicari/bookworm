@@ -5262,14 +5262,21 @@ THE END
       state.words.forEach(w => {
         const count = state.wordCounts[w.word] ?? 0;
         const pct   = totalWords ? ((count / totalWords) * 100).toFixed(2) : '0.00';
-        const item  = document.createElement('div');
+        const item   = document.createElement('div');
         item.className = 'word-stat-item';
-        item.innerHTML = `
-          <span class="word-stat-swatch" style="background:${w.color}"></span>
-          <span class="word-stat-label">${w.word}</span>
-          <span class="word-stat-count">${count.toLocaleString()}</span>
-          <span class="word-stat-pct">(${pct}%)</span>
-        `;
+        const swatch = document.createElement('span');
+        swatch.className = 'word-stat-swatch';
+        swatch.style.background = w.color;
+        const label = document.createElement('span');
+        label.className = 'word-stat-label';
+        label.textContent = w.word;
+        const countEl = document.createElement('span');
+        countEl.className = 'word-stat-count';
+        countEl.textContent = count.toLocaleString();
+        const pctEl = document.createElement('span');
+        pctEl.className = 'word-stat-pct';
+        pctEl.textContent = `(${pct}%)`;
+        item.append(swatch, label, countEl, pctEl);
         bar.appendChild(item);
       });
       bar.classList.add('visible');
@@ -5546,9 +5553,12 @@ THE END
       state.words.forEach((w, i) => {
         const btn = document.createElement('button');
         btn.className = 'legend-item' + (w.visible ? '' : ' faded');
-        btn.innerHTML =
-          `<span class="legend-dot" style="background:${w.color}"></span>` +
-          `<span>${w.word}</span>`;
+        const dot = document.createElement('span');
+        dot.className = 'legend-dot';
+        dot.style.background = w.color;
+        const lbl = document.createElement('span');
+        lbl.textContent = w.word;
+        btn.append(dot, lbl);
         btn.title = w.visible ? `Hide "${w.word}"` : `Show "${w.word}"`;
         btn.addEventListener('click', () => toggleWordVisibility(i));
         legend.appendChild(btn);
