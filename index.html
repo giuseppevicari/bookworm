@@ -1439,14 +1439,6 @@
                 </svg>
                 Export PNG
               </button>
-              <button class="toolbar-btn accent" id="shareBtn" title="Copy shareable link">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                </svg>
-                Copy Link
-              </button>
             </div>
           </div>
 
@@ -1543,7 +1535,7 @@
 
       <!-- ── Chapters ───────────────────────────────────────────── -->
       <div class="card chapter-panel" id="chapterPanel" style="display:none">
-        <div class="card-label">04 — Chapters</div>
+        <div class="card-label">04 — Chapter Navigator</div>
         <div class="chapter-notice" id="chapterNotice" style="display:none">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -6331,7 +6323,6 @@ THE END
 
     // Export and share
     document.getElementById('exportBtn').addEventListener('click', exportPng);
-    document.getElementById('shareBtn').addEventListener('click', copyShareLink);
 
     // Network search
     document.getElementById('networkSearchBtn').addEventListener('click', () => generateNetwork());
