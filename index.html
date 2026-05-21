@@ -34,6 +34,24 @@
       --font-mono:     'JetBrains Mono', monospace;
     }
 
+    /* ── Light mode overrides ────────────────────────────────────── */
+    [data-theme="light"] {
+      --bg-primary:    #f5f4f8;
+      --bg-secondary:  #eeecf6;
+      --bg-card:       #ffffff;
+      --border:        #d4d0ea;
+      --text-primary:  #1a1825;
+      --text-secondary:#6b6785;
+      --success:       #16a34a;
+      --danger:        #dc2626;
+    }
+
+    [data-theme="light"] body::before {
+      background:
+        radial-gradient(ellipse at 15% 15%, rgba(124,106,247,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 85%, rgba(244,114,182,0.03) 0%, transparent 55%);
+    }
+
     /* ── Reset ───────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -77,9 +95,27 @@
       border-bottom: 1px solid var(--border);
       margin-bottom: 48px;
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 20px;
     }
+
+    .theme-toggle {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 14px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: border-color 150ms, color 150ms;
+      flex-shrink: 0;
+    }
+    .theme-toggle:hover { border-color: var(--text-secondary); color: var(--text-primary); }
 
     .site-header h1 {
       font-family: var(--font-heading);
@@ -1115,6 +1151,20 @@
     <header class="site-header">
       <h1>Book<em>worm</em></h1>
       <span class="site-tagline">Narrative Frequency Visualizer</span>
+      <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
+        <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <span id="themeLabel">Light</span>
+      </button>
     </header>
 
     <div class="main-grid">
@@ -1694,9 +1744,10 @@
         const { ctx, chartArea, scales } = chart;
         const xScale = scales.x;
 
+        const isLight = document.documentElement.dataset.theme === 'light';
         ctx.save();
         ctx.font = "500 11px 'DM Sans', sans-serif";
-        ctx.fillStyle = 'rgba(200,196,220,0.92)';
+        ctx.fillStyle = isLight ? 'rgba(80,72,120,0.82)' : 'rgba(200,196,220,0.92)';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
 
@@ -1806,6 +1857,20 @@
       );
     }
 
+    // Return chart colours that match the current theme
+    function getThemeColors() {
+      const light = document.documentElement.dataset.theme === 'light';
+      return {
+        grid:          light ? 'rgba(0,0,0,0.06)'   : 'rgba(255,255,255,0.04)',
+        borderLine:    light ? 'rgba(0,0,0,0.1)'    : 'rgba(255,255,255,0.08)',
+        tick:          light ? '#6b6785'             : '#8884a0',
+        tooltipBg:     light ? '#ffffff'             : '#1c1c26',
+        tooltipBorder: light ? '#d4d0ea'             : '#2a2a38',
+        tooltipTitle:  light ? '#6b6785'             : '#8884a0',
+        tooltipBody:   light ? '#1a1825'             : '#e8e6f0',
+      };
+    }
+
     // Destroy any existing chart, then render a fresh one from state
     function renderChart() {
       const placeholder = document.getElementById('chartPlaceholder');
@@ -1829,6 +1894,7 @@
       }
 
       const canvas = document.getElementById('mainChart');
+      const tc = getThemeColors();
       state.chart = new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
@@ -1848,20 +1914,20 @@
           },
           scales: {
             x: {
-              grid:   { color: 'rgba(255,255,255,0.04)' },
-              border: { color: 'rgba(255,255,255,0.08)' },
+              grid:   { color: tc.grid },
+              border: { color: tc.borderLine },
               ticks: {
-                color:        '#8884a0',
+                color:        tc.tick,
                 font:         { family: "'DM Sans'", size: 11 },
                 maxTicksLimit: 12,
                 maxRotation:  0,
               },
             },
             y: {
-              grid:   { color: 'rgba(255,255,255,0.04)' },
+              grid:   { color: tc.grid },
               border: { display: false },
               ticks: {
-                color: '#8884a0',
+                color: tc.tick,
                 font:  { family: "'DM Sans'", size: 11 },
               },
               beginAtZero: true,
@@ -1873,12 +1939,12 @@
               ? { annotation: { clip: false, annotations: buildChapterAnnotations() } }
               : {}),
             tooltip: {
-              backgroundColor: '#1c1c26',
-              borderColor:     '#2a2a38',
+              backgroundColor: tc.tooltipBg,
+              borderColor:     tc.tooltipBorder,
               borderWidth:     1,
-              titleColor:      '#8884a0',
+              titleColor:      tc.tooltipTitle,
               titleFont:       { family: "'DM Sans'", size: 11 },
-              bodyColor:       '#e8e6f0',
+              bodyColor:       tc.tooltipBody,
               bodyFont:        { family: "'DM Sans'", size: 12 },
               padding:         12,
               displayColors:   true,
@@ -2483,7 +2549,7 @@
         .text(d => d.id)
         .attr('text-anchor', 'middle')
         .attr('dy', d => networkNodeRadius(d, maxCount) + 13)
-        .attr('fill', d => d.isCenter ? '#e8e6f0' : '#8884a0')
+        .style('fill', d => d.isCenter ? 'var(--text-primary)' : 'var(--text-secondary)')
         .style('font-size', d => d.isCenter ? '13px' : '11px')
         .style('font-family', 'var(--font-body)')
         .style('font-weight', d => d.isCenter ? '600' : '400')
@@ -2670,6 +2736,29 @@
     document.getElementById('networkSearchInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') generateNetwork();
     });
+
+    // ── Theme toggle ──────────────────────────────────────────────
+
+    // Apply theme to the document and update the toggle button appearance
+    function applyTheme(theme) {
+      const isLight = theme === 'light';
+      document.documentElement.dataset.theme = isLight ? 'light' : '';
+      document.getElementById('themeLabel').textContent = isLight ? 'Dark' : 'Light';
+      // Swap icon: sun when dark (click to go light), moon when light (click to go dark)
+      document.getElementById('themeIcon').innerHTML = isLight
+        ? '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
+        : '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+      if (state.chart) renderChart();
+    }
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('bw-theme', next);
+      applyTheme(next);
+    });
+
+    // Apply saved theme on load (default dark)
+    applyTheme(localStorage.getItem('bw-theme') || 'dark');
 
     // Pre-populate from URL on load
     parseUrlParams();
