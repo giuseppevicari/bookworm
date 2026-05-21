@@ -5171,24 +5171,22 @@ THE END
         Math.floor((tokens.length - windowSize) / stepSize) + 1);
 
       // Pre-separate single tokens from multi-token phrases
+      // All counts are keyed by normForMatch(w.word) — avoids Unicode form mismatches
       const singles    = words.filter(w => !w.word.includes(' '));
-      const phrases    = words.filter(w => w.word.includes(' ')).map(w => ({ word: w.word, toks: tokenize(w.word) }));
-      // Map normalized form → original word key (tokens are already normalized by tokenize)
-      const normToOrig = {};
-      for (const w of singles) normToOrig[normForMatch(w.word)] = w.word;
+      const phrases    = words.filter(w => w.word.includes(' ')).map(w => ({ normKey: normForMatch(w.word), toks: tokenize(w.word) }));
+      const singleKeys = new Set(singles.map(w => normForMatch(w.word)));
 
       for (let start = 0; start + windowSize <= tokens.length; start += stepSize) {
         const counts = {};
-        words.forEach(w => { counts[w.word] = 0; });
+        words.forEach(w => { counts[normForMatch(w.word)] = 0; });
 
         for (let j = start; j < start + windowSize; j++) {
           const tok = tokens[j];
-          // Single words (tok is already normalized; look up original key for counts)
+          // Single words — tok is already normalized by tokenize()
           if (exactMatch) {
-            const orig = normToOrig[tok];
-            if (orig) counts[orig]++;
+            if (singleKeys.has(tok)) counts[tok]++;
           } else {
-            for (const w of singles) { if (tok.includes(normForMatch(w.word))) counts[w.word]++; }
+            for (const w of singles) { if (tok.includes(normForMatch(w.word))) counts[normForMatch(w.word)]++; }
           }
           // Phrases: match consecutive token sequences
           for (const ph of phrases) {
@@ -5198,7 +5196,7 @@ THE END
               for (let k = 1; k < pt.length; k++) {
                 if (tokens[j + k] !== pt[k]) { match = false; break; }
               }
-              if (match) counts[ph.word]++;
+              if (match) counts[ph.normKey]++;
             }
           }
         }
@@ -5272,18 +5270,17 @@ THE END
       const effectiveStep   = Math.min(state.stepSize, effectiveWindow);
 
       // Count total occurrences per word/phrase in the full token list
+      // All wordCounts keyed by normForMatch(w.word) — avoids Unicode form mismatches
       const wordCounts = {};
-      for (const w of state.words) wordCounts[w.word] = 0;
-      const cSingles = state.words.filter(w => !w.word.includes(' '));
-      const cPhrases = state.words.filter(w => w.word.includes(' ')).map(w => ({ word: w.word, toks: tokenize(w.word) }));
-      // Map normalized → original for accent-insensitive lookup
-      const cNormToOrig = {};
-      for (const w of cSingles) cNormToOrig[normForMatch(w.word)] = w.word;
+      for (const w of state.words) wordCounts[normForMatch(w.word)] = 0;
+      const cSingles    = state.words.filter(w => !w.word.includes(' '));
+      const cPhrases    = state.words.filter(w => w.word.includes(' ')).map(w => ({ normKey: normForMatch(w.word), toks: tokenize(w.word) }));
+      const cSingleKeys = new Set(cSingles.map(w => normForMatch(w.word)));
       if (state.exactMatch) {
-        for (const t of tokens) { const o = cNormToOrig[t]; if (o) wordCounts[o]++; }
+        for (const t of tokens) { if (cSingleKeys.has(t)) wordCounts[t]++; }
       } else {
         for (const t of tokens) {
-          for (const w of cSingles) { if (t.includes(normForMatch(w.word))) wordCounts[w.word]++; }
+          for (const w of cSingles) { if (t.includes(normForMatch(w.word))) wordCounts[normForMatch(w.word)]++; }
         }
       }
       for (const ph of cPhrases) {
@@ -5294,7 +5291,7 @@ THE END
             for (let k = 1; k < pt.length; k++) {
               if (tokens[i + k] !== pt[k]) { match = false; break; }
             }
-            if (match) wordCounts[ph.word]++;
+            if (match) wordCounts[ph.normKey]++;
           }
         }
       }
@@ -5342,7 +5339,7 @@ THE END
       }
       const totalWords = state.rawText.split(/\s+/).filter(Boolean).length;
       state.words.forEach(w => {
-        const count = state.wordCounts[w.word] ?? 0;
+        const count = state.wordCounts[normForMatch(w.word)] ?? 0;
         const pct   = totalWords ? ((count / totalWords) * 100).toFixed(2) : '0.00';
         const item   = document.createElement('div');
         item.className = 'word-stat-item';
@@ -5422,7 +5419,7 @@ THE END
     function buildDatasets() {
       return state.words.map(w => ({
         label:                    w.word,
-        data:                     state.windows.map(win => win.counts[w.word] || 0),
+        data:                     state.windows.map(win => win.counts[normForMatch(w.word)] || 0),
         borderColor:              w.color,
         backgroundColor:          w.color + '12',
         borderWidth:              2.5,
@@ -5813,10 +5810,10 @@ THE END
         chip.appendChild(label);
 
         // Show total occurrence count if analysis has been run
-        if (state.wordCounts[w.word] !== undefined) {
+        if (state.wordCounts[normForMatch(w.word)] !== undefined) {
           const countBadge = document.createElement('span');
           countBadge.className = 'chip-count';
-          countBadge.textContent = state.wordCounts[w.word].toLocaleString();
+          countBadge.textContent = state.wordCounts[normForMatch(w.word)].toLocaleString();
           chip.appendChild(countBadge);
         }
 
