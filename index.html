@@ -5143,6 +5143,11 @@ THE END
     // ANALYSER
     // ─────────────────────────────────────────────────────────────────
 
+    // Strip combining diacritics and lowercase — used for accent-insensitive comparison
+    function normForMatch(s) {
+      return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    }
+
     // Split text into lowercase tokens, stripping punctuation (keeps apostrophes/hyphens)
     // NFD normalization strips diacritics so "Nazgûl" → "nazgul"
     function tokenize(text) {
@@ -5165,8 +5170,9 @@ THE END
       // Pre-separate single tokens from multi-token phrases
       const singles    = words.filter(w => !w.word.includes(' '));
       const phrases    = words.filter(w => w.word.includes(' ')).map(w => ({ word: w.word, toks: tokenize(w.word) }));
-      const singleSet  = new Set(singles.map(w => w.word));
-      const singleList = singles.map(w => w.word);
+      // Map normalized form → original word key (tokens are already normalized by tokenize)
+      const normToOrig = {};
+      for (const w of singles) normToOrig[normForMatch(w.word)] = w.word;
 
       for (let start = 0; start + windowSize <= tokens.length; start += stepSize) {
         const counts = {};
@@ -5174,11 +5180,12 @@ THE END
 
         for (let j = start; j < start + windowSize; j++) {
           const tok = tokens[j];
-          // Single words
+          // Single words (tok is already normalized; look up original key for counts)
           if (exactMatch) {
-            if (singleSet.has(tok)) counts[tok]++;
+            const orig = normToOrig[tok];
+            if (orig) counts[orig]++;
           } else {
-            for (const w of singleList) { if (tok.includes(w)) counts[w]++; }
+            for (const w of singles) { if (tok.includes(normForMatch(w.word))) counts[w.word]++; }
           }
           // Phrases: match consecutive token sequences
           for (const ph of phrases) {
@@ -5266,12 +5273,14 @@ THE END
       for (const w of state.words) wordCounts[w.word] = 0;
       const cSingles = state.words.filter(w => !w.word.includes(' '));
       const cPhrases = state.words.filter(w => w.word.includes(' ')).map(w => ({ word: w.word, toks: tokenize(w.word) }));
+      // Map normalized → original for accent-insensitive lookup
+      const cNormToOrig = {};
+      for (const w of cSingles) cNormToOrig[normForMatch(w.word)] = w.word;
       if (state.exactMatch) {
-        const wSet = new Set(cSingles.map(w => w.word));
-        for (const t of tokens) { if (wSet.has(t)) wordCounts[t]++; }
+        for (const t of tokens) { const o = cNormToOrig[t]; if (o) wordCounts[o]++; }
       } else {
         for (const t of tokens) {
-          for (const w of cSingles) { if (t.includes(w.word)) wordCounts[w.word]++; }
+          for (const w of cSingles) { if (t.includes(normForMatch(w.word))) wordCounts[w.word]++; }
         }
       }
       for (const ph of cPhrases) {
@@ -5823,7 +5832,7 @@ THE END
 
     // Add a normalised word to state.words; re-run analysis if results already exist
     function addWord(raw) {
-      const word = raw.trim().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      const word = raw.trim().toLowerCase();
       if (!word || state.words.length >= 8) return;
       if (state.words.some(w => w.word === word)) return;
 
@@ -5974,12 +5983,12 @@ THE END
       if (!state.words.length) return escaped;
 
       const wordMap = {};
-      for (const w of state.words) wordMap[w.word.toLowerCase()] = w.color;
+      for (const w of state.words) wordMap[normForMatch(w.word)] = w.color;
 
       // Allow optional combining diacritics after each letter so "nazgul" matches "Nazgûl"
       const COMBINING = '[\\u0300-\\u036f]*';
       const pattern = state.words
-        .map(w => w.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[a-z]/gi, `$&${COMBINING}`))
+        .map(w => normForMatch(w.word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[a-z]/gi, `$&${COMBINING}`))
         .join('|');
 
       const re = state.exactMatch
@@ -5987,7 +5996,7 @@ THE END
         : new RegExp(`(${pattern})`, 'gi');
 
       return escaped.replace(re, (match) => {
-        const key = match.normalize('NFC').toLowerCase();
+        const key = normForMatch(match);
         const color = wordMap[key] ||
           Object.entries(wordMap).find(([k]) => key.includes(k))?.[1] || '';
         return `<mark style="background:${color}22;color:${color};border-radius:3px;padding:0 2px;">${match}</mark>`;
