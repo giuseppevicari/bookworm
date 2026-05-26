@@ -5064,12 +5064,20 @@ THE END
       }
     }
 
-    // Extract text from every page of a PDF, calling onProgress(0–1) each page
+    // Extract text from every page of a PDF, calling onProgress(0–1) each page.
+    // Returns { text, title } where title comes from PDF metadata (may be null).
     async function parsePdf(file, onProgress) {
       const buffer = await file.arrayBuffer();
       const pdf    = await pdfjsLib.getDocument({ data: buffer }).promise;
       const total  = pdf.numPages;
       const parts  = [];
+
+      let pdfTitle = null;
+      try {
+        const meta = await pdf.getMetadata();
+        const t = meta.info && meta.info.Title && meta.info.Title.trim();
+        if (t) pdfTitle = t;
+      } catch {}
 
       for (let i = 1; i <= total; i++) {
         const page    = await pdf.getPage(i);
@@ -5078,7 +5086,22 @@ THE END
         onProgress(i / total);
       }
 
-      return parts.join('\n');
+      return { text: parts.join('\n'), title: pdfTitle };
+    }
+
+    // Scan the first 100 lines for a "Title: …" header (Project Gutenberg convention)
+    function extractTitleFromTxt(text) {
+      const lines = text.split('\n', 100);
+      for (const line of lines) {
+        const m = line.match(/^Title:\s*(.+)/i);
+        if (m) return m[1].trim();
+      }
+      return null;
+    }
+
+    // Strip file extension and convert hyphens/underscores to spaces
+    function cleanFilename(name) {
+      return name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
     }
 
     // Count whitespace-delimited words in a string
@@ -5100,23 +5123,27 @@ THE END
 
       try {
         let text;
+        let bookTitle;
 
         if (ext === 'txt') {
           showProgress('Reading file…', 0.3);
-          text = await parseTxt(file);
+          text      = await parseTxt(file);
+          bookTitle = extractTitleFromTxt(text) || cleanFilename(file.name);
           showProgress('Done', 1);
         } else {
           showProgress('Extracting pages… 0%', 0);
-          text = await parsePdf(file, pct => {
+          const result = await parsePdf(file, pct => {
             showProgress(`Extracting pages… ${Math.round(pct * 100)}%`, pct);
           });
+          text      = result.text;
+          bookTitle = result.title || cleanFilename(file.name);
         }
 
         state.rawText      = text;
         state.chapters     = detectChapters(text);
         state.wordCharMap  = buildWordCharMap(text);
         hideProgress();
-        showFileInfo(file.name, countWords(text));
+        showFileInfo(file.name, countWords(text), bookTitle);
         enableWordSection();
         renderChapterPanel();
 
@@ -5138,7 +5165,7 @@ THE END
       state.rawText         = text;
       state.chapters        = detectChapters(text);
       state.wordCharMap     = buildWordCharMap(text);
-      showFileInfo(`Sample Text: ${SAMPLE_TEXT_META.title}`, countWords(text));
+      showFileInfo(`Sample Text: ${SAMPLE_TEXT_META.title}`, countWords(text), SAMPLE_TEXT_META.title);
       enableWordSection();
       renderChapterPanel();
     }
@@ -5541,23 +5568,39 @@ THE END
           labels:   buildLabels(),
           datasets: buildDatasets(),
         },
-        plugins: [{
-          id: 'bgFill',
-          beforeDraw(chart) {
-            const ctx = chart.canvas.getContext('2d');
-            const light = document.documentElement.dataset.theme === 'light';
-            ctx.save();
-            ctx.fillStyle = light ? '#ffffff' : '#1c1c26';
-            ctx.fillRect(0, 0, chart.width, chart.height);
-            ctx.restore();
-          }
-        }],
+        plugins: [
+          {
+            id: 'bgFill',
+            beforeDraw(chart) {
+              const ctx = chart.canvas.getContext('2d');
+              const light = document.documentElement.dataset.theme === 'light';
+              ctx.save();
+              ctx.fillStyle = light ? '#ffffff' : '#1c1c26';
+              ctx.fillRect(0, 0, chart.width, chart.height);
+              ctx.restore();
+            }
+          },
+          {
+            id: 'bookTitle',
+            afterDraw(chart) {
+              if (!state.title) return;
+              const { ctx } = chart;
+              ctx.save();
+              ctx.font = "normal 17px 'DM Serif Display', serif";
+              ctx.fillStyle = tc.textPrimary;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+              ctx.fillText(state.title, chart.width / 2, 14);
+              ctx.restore();
+            }
+          },
+        ],
         options: {
           devicePixelRatio:    window.devicePixelRatio || 1,
           responsive:          true,
           maintainAspectRatio: false,
           animation:           { duration: 350 },
-          layout:              { padding: { top: 90 } },
+          layout:              { padding: { top: state.title ? 130 : 90 } },
           interaction:         { mode: 'index', intersect: false },
           onClick: (event, elements, chart) => {
             const pts = chart.getElementsAtEventForMode(event, 'index', { intersect: false }, true);
@@ -5586,13 +5629,6 @@ THE END
           },
           plugins: {
             legend: { display: false },
-            title: {
-              display:  !!state.title,
-              text:     state.title,
-              color:    tc.textPrimary,
-              font:     { family: "'DM Serif Display'", size: 17, weight: 'normal' },
-              padding:  { top: 6, bottom: 6 },
-            },
             ...(annotationAvailable
               ? { annotation: { clip: false, annotations: buildChapterAnnotations() } }
               : {}),
@@ -5764,8 +5800,8 @@ THE END
     function hideError() { errorMsg.classList.remove('visible'); }
 
     // Show the post-upload file summary and hide the sample text option
-    function showFileInfo(name, words) {
-      state.title           = name;
+    function showFileInfo(name, words, bookTitle) {
+      state.title           = bookTitle !== undefined ? bookTitle : name;
       fileInfo.classList.add('visible');
       fileName.textContent  = name;
       wordCount.textContent = `${words.toLocaleString()} words extracted`;

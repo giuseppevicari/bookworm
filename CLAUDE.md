@@ -67,7 +67,7 @@ const state = {
   windows: [],            // array of { offset, counts: { normForMatch(word): n } }
   chapters: [],           // array of { title, wordOffset, windowIdx }
   wordCounts: {},         // total occurrence count per word; keyed by normForMatch(w.word)
-  title: '',              // file name / sample text title — shown as Chart.js title plugin, captured in PNG
+  title: '',              // extracted book title (not filename) — drawn by bookTitle plugin, captured in PNG
   wordCharMap: [],        // char offsets of every whitespace-delimited word (for excerpt lookup)
   showChapterLabels: true,// toggle for chapter label visibility on chart
   windowSize: 500,        // words per window (user-adjustable)
@@ -219,7 +219,7 @@ Accent and font variables are shared between themes and are not overridden in li
 **Chart style:**
 - Background: `var(--bg-card)`
 - Grid lines, tick colours, tooltip colours, and the chart title colour are resolved at render time by `getThemeColors()` — never hardcode these values
-- Chart title: uses the Chart.js built-in `title` plugin (`plugins.title`). `display` is `!!state.title`; text is `state.title`; font family `'DM Serif Display'`, size 17. Set in `showFileInfo()`, cleared on "Change". Because it renders onto the chart canvas it is captured automatically in PNG export.
+- Chart title: drawn by an inline `bookTitle` `afterDraw` plugin at a fixed y=14 near the top of the canvas. Uses `tc.textPrimary`, `'DM Serif Display'` 17px. **Do NOT use the built-in `plugins.title`** — it renders immediately above `chartArea.top`, which is exactly where chapter labels anchor upward, causing unavoidable overlap. The custom plugin draws above the `layout.padding.top` zone used by chapter labels. `layout.padding.top` is `130` when `state.title` is set (vs `90` without title) so chapter labels never reach y=14. Captured automatically in PNG export as it is part of the chart canvas.
 - Tooltip: card styled to match the active theme, with colored word label and frequency value
 - Chapter annotation lines: dashed, `rgba(255,255,255,0.25)`, label colour picked in `chapterLabelPlugin.afterDraw` based on theme
 
