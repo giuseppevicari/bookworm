@@ -67,7 +67,7 @@ const state = {
   windows: [],            // array of { offset, counts: { normForMatch(word): n } }
   chapters: [],           // array of { title, wordOffset, windowIdx }
   wordCounts: {},         // total occurrence count per word; keyed by normForMatch(w.word)
-  title: '',              // extracted book title (not filename) — drawn by bookTitle plugin, captured in PNG
+  title: '',              // extracted book title — set by showFileInfo(); not rendered on screen
   wordCharMap: [],        // char offsets of every whitespace-delimited word (for excerpt lookup)
   showChapterLabels: true,// toggle for chapter label visibility on chart
   windowSize: 500,        // words per window (user-adjustable)
@@ -143,7 +143,9 @@ Complete and test each phase before starting the next. Do not skip ahead.
 ~~Removed. The heatmap tab has been deleted from the app.~~
 
 ### Phase 7 — Export & Shareable URL
-- "Export PNG" button: composites the chart canvas with a legend row (colored dot + word label + total occurrence count per visible word, e.g. `Frodo (142)`) onto an offscreen canvas, then downloads as `bookworm-export.png`. The canvas background is filled with the active theme's card color via a `beforeDraw` plugin (`bgFill`) registered inline on the Chart instance.
+- "Export PNG" button behaviour depends on the active tab:
+  - **Frequency tab:** composites the chart canvas with a legend row (colored dot + word label + total occurrence count, e.g. `Frodo (142)`) onto an offscreen canvas; downloads as `bookworm-export.png`. Canvas background filled via the `bgFill` `beforeDraw` plugin registered inline on the Chart instance.
+  - **Network tab:** calls `exportNetworkPng()` — clones the D3 SVG, resolves all inline CSS variables to literal values (they don't resolve in a blob context), draws onto a canvas with `devicePixelRatio` scaling, downloads as `bookworm-network.png`.
 - ~~"Copy Link" button~~ — removed. The `copyShareLink` function and URL param encoding still exist in code but are not exposed in the UI.
 - On page load: parse URL parameters (`?words=Darcy,Elizabeth&window=500&exact=1`) and pre-populate word input and window slider if present
 - Shareable URL does not include book text — user must re-upload
@@ -218,8 +220,8 @@ Accent and font variables are shared between themes and are not overridden in li
 
 **Chart style:**
 - Background: `var(--bg-card)`
-- Grid lines, tick colours, tooltip colours, and the chart title colour are resolved at render time by `getThemeColors()` — never hardcode these values
-- Chart title: not shown on the chart canvas. `state.title` is extracted and stored (TXT: "Title: …" header; PDF: metadata; fallback: cleaned filename) but is not rendered on screen.
+- Grid lines, tick colours, and tooltip colours are resolved at render time by `getThemeColors()` — never hardcode these values
+- Chart title: not rendered. `state.title` is extracted (TXT: "Title: …" header; PDF: metadata; fallback: cleaned filename) and stored but not displayed anywhere.
 - Tooltip: card styled to match the active theme, with colored word label and frequency value
 - Chapter annotation lines: dashed, `rgba(255,255,255,0.25)`, label colour picked in `chapterLabelPlugin.afterDraw` based on theme
 
@@ -247,9 +249,9 @@ Accent and font variables are shared between themes and are not overridden in li
 
 10. **URL length limits:** Keep shareable URLs short. Encode word list as comma-separated plain text, not JSON. Do not attempt to encode book text in the URL.
 
-12. **Export PNG background defaults to black without a fill plugin:** `chart.toBase64Image()` composites the canvas onto a transparent PNG, which renders black. Always keep the `bgFill` `beforeDraw` plugin registered inline on the Chart instance so it fills the correct theme color before every draw. If `renderChart()` is rewritten, do not remove this plugin.
-
 11. **`afterDraw` runs on every chart event — keep it O(chapters) not O(chapters×windows):** The `chapterLabelPlugin.afterDraw` hook fires on every tooltip hover, resize, and animation frame. Any inner loop over `state.windows` inside it is a hot-path O(n×m) scan. Always pre-compute chapter-to-window mappings (stored as `ch.windowIdx`) in `runAnalysis` once, after `state.windows` is populated, and just read the cached value in `afterDraw`.
+
+12. **Export PNG background defaults to black without a fill plugin:** `chart.toBase64Image()` composites the canvas onto a transparent PNG, which renders black. Always keep the `bgFill` `beforeDraw` plugin registered inline on the Chart instance so it fills the correct theme color before every draw. If `renderChart()` is rewritten, do not remove this plugin.
 
 13. **Text file encoding — never use `FileReader.readAsText`:** Many real-world `.txt` files (especially Windows-created ones) are encoded in Windows-1252, not UTF-8. `FileReader.readAsText(file, 'UTF-8')` silently garbles non-ASCII bytes (e.g. `û` U+00FB → replacement chars or wrong glyphs) rather than throwing an error, making the bug invisible. Always read as `ArrayBuffer`, then attempt `new TextDecoder('utf-8', { fatal: true }).decode(bytes)`, and fall back to `new TextDecoder('windows-1252').decode(bytes)` if that throws. This covers UTF-8, UTF-8 BOM, and Windows-1252 without user intervention.
 
@@ -301,7 +303,8 @@ Keep test files in the `test/` folder. They are not part of the deliverable.
 - [ ] Clicking a chart point opens the reading panel with correct excerpt
 - [ ] Tracked words are highlighted correctly in the excerpt
 - [ ] Animation plays, pauses, and resets correctly
-- [ ] PNG export downloads with correct theme background and legend row below the chart
+- [ ] Frequency PNG export downloads with correct theme background and legend row (word + count)
+- [ ] Network PNG export downloads correctly with resolved colours (no black or empty canvas)
 - [ ] URL params (`?words=…&window=…`) pre-populate the UI on load
 
 ---
