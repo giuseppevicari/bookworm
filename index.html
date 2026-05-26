@@ -781,6 +781,14 @@
     .legend-item.faded { opacity: 0.35; }
     .legend-item:hover { border-color: var(--text-secondary); }
 
+    .legend-count {
+      font-size: 0.68rem;
+      opacity: 0.6;
+      background: rgba(0,0,0,0.18);
+      padding: 1px 5px;
+      border-radius: 999px;
+    }
+
     .legend-dot {
       width: 8px;
       height: 8px;
@@ -5534,7 +5542,6 @@ THE END
         tooltipBorder: light ? '#d4d0ea'             : '#2a2a38',
         tooltipTitle:  light ? '#6b6785'             : '#8884a0',
         tooltipBody:   light ? '#1a1825'             : '#e8e6f0',
-        textPrimary:   light ? '#1a1825'             : '#e8e6f0',
       };
     }
 
@@ -5568,39 +5575,23 @@ THE END
           labels:   buildLabels(),
           datasets: buildDatasets(),
         },
-        plugins: [
-          {
-            id: 'bgFill',
-            beforeDraw(chart) {
-              const ctx = chart.canvas.getContext('2d');
-              const light = document.documentElement.dataset.theme === 'light';
-              ctx.save();
-              ctx.fillStyle = light ? '#ffffff' : '#1c1c26';
-              ctx.fillRect(0, 0, chart.width, chart.height);
-              ctx.restore();
-            }
-          },
-          {
-            id: 'bookTitle',
-            afterDraw(chart) {
-              if (!state.title) return;
-              const { ctx } = chart;
-              ctx.save();
-              ctx.font = "normal 17px 'DM Serif Display', serif";
-              ctx.fillStyle = tc.textPrimary;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'top';
-              ctx.fillText(state.title, chart.width / 2, 14);
-              ctx.restore();
-            }
-          },
-        ],
+        plugins: [{
+          id: 'bgFill',
+          beforeDraw(chart) {
+            const ctx = chart.canvas.getContext('2d');
+            const light = document.documentElement.dataset.theme === 'light';
+            ctx.save();
+            ctx.fillStyle = light ? '#ffffff' : '#1c1c26';
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
+          }
+        }],
         options: {
           devicePixelRatio:    window.devicePixelRatio || 1,
           responsive:          true,
           maintainAspectRatio: false,
           animation:           { duration: 350 },
-          layout:              { padding: { top: state.title ? 130 : 90 } },
+          layout:              { padding: { top: 90 } },
           interaction:         { mode: 'index', intersect: false },
           onClick: (event, elements, chart) => {
             const pts = chart.getElementsAtEventForMode(event, 'index', { intersect: false }, true);
@@ -5683,6 +5674,15 @@ THE END
         const lbl = document.createElement('span');
         lbl.textContent = w.word;
         btn.append(dot, lbl);
+
+        const count = state.wordCounts[normForMatch(w.word)];
+        if (count !== undefined) {
+          const cnt = document.createElement('span');
+          cnt.className = 'legend-count';
+          cnt.textContent = count.toLocaleString();
+          btn.append(cnt);
+        }
+
         btn.title = w.visible ? `Hide "${w.word}"` : `Show "${w.word}"`;
         btn.addEventListener('click', () => toggleWordVisibility(i));
         legend.appendChild(btn);

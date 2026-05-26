@@ -150,7 +150,7 @@ Complete and test each phase before starting the next. Do not skip ahead.
 
 ### Post-Phase Additions
 
-**Word count badges (in chips):** After analysis runs, each word chip shows a small badge with the total occurrence count across the full text. Stored in `state.wordCounts`.
+**Word count badges:** After analysis runs, total occurrence counts appear in two places: (1) each word chip in the input section (`.chip-count` badge, styled monospace); (2) each clickable legend pill under the chart (`.legend-count` badge). Both read from `state.wordCounts` keyed by `normForMatch(w.word)`. The PNG export legend also includes the count (format `word (142)`). `renderLegend()` is called at the end of `renderChart()` and `updateChart()`, so counts appear as soon as the chart renders.
 
 **Exact match toggle:** Checkbox in the "02 — Track Words" card, positioned directly below the word input field. When on (default), uses `\b` word-boundary regex so "book" won't match "bookworm". When off, uses substring matching. Re-runs analysis on toggle if results already exist.
 
@@ -219,7 +219,7 @@ Accent and font variables are shared between themes and are not overridden in li
 **Chart style:**
 - Background: `var(--bg-card)`
 - Grid lines, tick colours, tooltip colours, and the chart title colour are resolved at render time by `getThemeColors()` — never hardcode these values
-- Chart title: drawn by an inline `bookTitle` `afterDraw` plugin at a fixed y=14 near the top of the canvas. Uses `tc.textPrimary`, `'DM Serif Display'` 17px. **Do NOT use the built-in `plugins.title`** — it renders immediately above `chartArea.top`, which is exactly where chapter labels anchor upward, causing unavoidable overlap. The custom plugin draws above the `layout.padding.top` zone used by chapter labels. `layout.padding.top` is `130` when `state.title` is set (vs `90` without title) so chapter labels never reach y=14. Captured automatically in PNG export as it is part of the chart canvas.
+- Chart title: not shown on the chart canvas. `state.title` is extracted and stored (TXT: "Title: …" header; PDF: metadata; fallback: cleaned filename) but is not rendered on screen.
 - Tooltip: card styled to match the active theme, with colored word label and frequency value
 - Chapter annotation lines: dashed, `rgba(255,255,255,0.25)`, label colour picked in `chapterLabelPlugin.afterDraw` based on theme
 
