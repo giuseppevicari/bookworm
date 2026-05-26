@@ -6314,8 +6314,67 @@ THE END
     // ─────────────────────────────────────────────────────────────────
 
     // Download the active view as a PNG file, composited with a legend row
+    // Export the semantic network SVG as a PNG by resolving CSS vars and stamping onto a canvas
+    function exportNetworkPng() {
+      const container = document.getElementById('networkSvg');
+      const svgEl     = container.querySelector('svg');
+      if (!svgEl) { showToast('Generate a network first'); return; }
+
+      const light         = document.documentElement.dataset.theme === 'light';
+      const bgColor       = light ? '#eeecf6' : '#16161d';
+      const textPrimary   = light ? '#1a1825' : '#e8e6f0';
+      const textSecondary = light ? '#6b6785' : '#8884a0';
+      const dpr           = window.devicePixelRatio || 1;
+
+      const W = Math.round(svgEl.getBoundingClientRect().width) || 700;
+      const H = parseInt(svgEl.getAttribute('height')) || 480;
+
+      const clone = svgEl.cloneNode(true);
+      clone.setAttribute('width', W);
+      clone.setAttribute('height', H);
+
+      // CSS variable values are stored as literal strings in inline styles;
+      // they won't resolve in a blob context, so replace them explicitly.
+      const varMap = {
+        'var(--bg-secondary)':   bgColor,
+        'var(--text-primary)':   textPrimary,
+        'var(--text-secondary)': textSecondary,
+        'var(--font-body)':      "'DM Sans', sans-serif",
+        'var(--font-mono)':      "'JetBrains Mono', monospace",
+      };
+      [clone, ...clone.querySelectorAll('[style]')].forEach(el => {
+        const s = el.getAttribute('style');
+        if (!s) return;
+        el.setAttribute('style', s.replace(/var\(--[\w-]+\)/g, m => varMap[m] || m));
+      });
+
+      const svgStr = new XMLSerializer().serializeToString(clone);
+      const blob   = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url    = URL.createObjectURL(blob);
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas  = document.createElement('canvas');
+        canvas.width  = W * dpr;
+        canvas.height = H * dpr;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(img, 0, 0, W, H);
+        URL.revokeObjectURL(url);
+        const a = document.createElement('a');
+        a.href     = canvas.toDataURL('image/png');
+        a.download = 'bookworm-network.png';
+        a.click();
+        showToast('Saved as bookworm-network.png');
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); showToast('Export failed — try again'); };
+      img.src = url;
+    }
+
     function exportPng() {
-      if (state.activeTab === 'network') { showToast('Switch to Frequency to export'); return; }
+      if (state.activeTab === 'network') { exportNetworkPng(); return; }
       if (!state.chart) { showToast('Run analysis first'); return; }
 
       const light     = document.documentElement.dataset.theme === 'light';
