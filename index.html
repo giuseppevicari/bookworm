@@ -1648,6 +1648,7 @@
       stepSize:         100,
       exactMatch:       true, // when true, "book" won't match "bookworm"
       wordCounts:       {},   // total occurrence count per word in full text
+      title:            '',   // file name or sample text title shown on chart
       chart:            null,
       showChapterLabels: true,
       activeTab:        'frequency', // 'frequency' | 'network'
@@ -5506,6 +5507,7 @@ THE END
         tooltipBorder: light ? '#d4d0ea'             : '#2a2a38',
         tooltipTitle:  light ? '#6b6785'             : '#8884a0',
         tooltipBody:   light ? '#1a1825'             : '#e8e6f0',
+        textPrimary:   light ? '#1a1825'             : '#e8e6f0',
       };
     }
 
@@ -5584,6 +5586,13 @@ THE END
           },
           plugins: {
             legend: { display: false },
+            title: {
+              display:  !!state.title,
+              text:     state.title,
+              color:    tc.textPrimary,
+              font:     { family: "'DM Serif Display'", size: 17, weight: 'normal' },
+              padding:  { top: 6, bottom: 6 },
+            },
             ...(annotationAvailable
               ? { annotation: { clip: false, annotations: buildChapterAnnotations() } }
               : {}),
@@ -5756,6 +5765,7 @@ THE END
 
     // Show the post-upload file summary and hide the sample text option
     function showFileInfo(name, words) {
+      state.title           = name;
       fileInfo.classList.add('visible');
       fileName.textContent  = name;
       wordCount.textContent = `${words.toLocaleString()} words extracted`;
@@ -5926,6 +5936,7 @@ THE END
     changeFileBtn.addEventListener('click', e => {
       e.stopPropagation();
       state.rawText     = '';
+      state.title       = '';
       state.windows     = [];
       state.chapters    = [];
       state.wordCharMap = [];

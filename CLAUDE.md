@@ -67,6 +67,7 @@ const state = {
   windows: [],            // array of { offset, counts: { normForMatch(word): n } }
   chapters: [],           // array of { title, wordOffset, windowIdx }
   wordCounts: {},         // total occurrence count per word; keyed by normForMatch(w.word)
+  title: '',              // file name / sample text title — shown as Chart.js title plugin, captured in PNG
   wordCharMap: [],        // char offsets of every whitespace-delimited word (for excerpt lookup)
   showChapterLabels: true,// toggle for chapter label visibility on chart
   windowSize: 500,        // words per window (user-adjustable)
@@ -217,7 +218,8 @@ Accent and font variables are shared between themes and are not overridden in li
 
 **Chart style:**
 - Background: `var(--bg-card)`
-- Grid lines, tick colours, and tooltip colours are resolved at render time by `getThemeColors()` — never hardcode these values
+- Grid lines, tick colours, tooltip colours, and the chart title colour are resolved at render time by `getThemeColors()` — never hardcode these values
+- Chart title: uses the Chart.js built-in `title` plugin (`plugins.title`). `display` is `!!state.title`; text is `state.title`; font family `'DM Serif Display'`, size 17. Set in `showFileInfo()`, cleared on "Change". Because it renders onto the chart canvas it is captured automatically in PNG export.
 - Tooltip: card styled to match the active theme, with colored word label and frequency value
 - Chapter annotation lines: dashed, `rgba(255,255,255,0.25)`, label colour picked in `chapterLabelPlugin.afterDraw` based on theme
 
