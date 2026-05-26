@@ -142,7 +142,7 @@ Complete and test each phase before starting the next. Do not skip ahead.
 ~~Removed. The heatmap tab has been deleted from the app.~~
 
 ### Phase 7 — Export & Shareable URL
-- "Export PNG" button: composites the chart canvas with a legend row (colored dot + word label per visible word) onto an offscreen canvas, then downloads as `bookworm-export.png`. The canvas background is filled with the active theme's card color via a `beforeDraw` plugin (`bgFill`) registered inline on the Chart instance.
+- "Export PNG" button: composites the chart canvas with a legend row (colored dot + word label + total occurrence count per visible word, e.g. `Frodo (142)`) onto an offscreen canvas, then downloads as `bookworm-export.png`. The canvas background is filled with the active theme's card color via a `beforeDraw` plugin (`bgFill`) registered inline on the Chart instance.
 - ~~"Copy Link" button~~ — removed. The `copyShareLink` function and URL param encoding still exist in code but are not exposed in the UI.
 - On page load: parse URL parameters (`?words=Darcy,Elizabeth&window=500&exact=1`) and pre-populate word input and window slider if present
 - Shareable URL does not include book text — user must re-upload

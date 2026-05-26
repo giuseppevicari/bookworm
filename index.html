@@ -6301,7 +6301,11 @@ THE END
         ctx.font = `${fontSize}px 'DM Sans', system-ui, sans-serif`;
         ctx.textBaseline = 'middle';
 
-        const pillWidths = visibleWords.map(w => dotR * 2 + dotGap + ctx.measureText(w.word).width);
+        const labels = visibleWords.map(w => {
+          const count = state.wordCounts[normForMatch(w.word)] || 0;
+          return `${w.word} (${count.toLocaleString()})`;
+        });
+        const pillWidths = labels.map(l => dotR * 2 + dotGap + ctx.measureText(l).width);
         const totalW     = pillWidths.reduce((a, b) => a + b, 0) + pillGap * (visibleWords.length - 1);
         let x = (cw - totalW) / 2;
         const y = ch + legendH / 2;
@@ -6313,7 +6317,7 @@ THE END
           ctx.fill();
 
           ctx.fillStyle = textColor;
-          ctx.fillText(w.word, x + dotR * 2 + dotGap, y);
+          ctx.fillText(labels[i], x + dotR * 2 + dotGap, y);
           x += pillWidths[i] + pillGap;
         });
       }
